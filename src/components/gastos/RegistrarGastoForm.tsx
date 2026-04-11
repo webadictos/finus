@@ -128,6 +128,8 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
       if (result.error) {
         setError(result.error)
       } else {
+        setForm(initialForm(transaccion))
+        setError(null)
         onOpenChange(false)
       }
     })
