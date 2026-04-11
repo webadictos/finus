@@ -65,14 +65,17 @@ export interface Ingreso {
   usuario_id: string
   nombre: string
   tipo: TipoIngreso
-  monto_esperado: number
-  moneda: string
+  es_recurrente: boolean
+  frecuencia: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
+  dia_del_mes: number | null
+  monto_fijo: number | null
+  monto_esperado: number | null
   fecha_esperada: string | null
   fecha_real: string | null
-  recurrente_dia: number | null // día del mes para recurrentes
+  monto_real: number | null
   estado: EstadoIngreso | 'esperado'
   probabilidad: NivelCerteza
-  notas: string | null
+  cuenta_destino_id: string | null
   created_at: string
 }
 

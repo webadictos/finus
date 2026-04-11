@@ -150,14 +150,25 @@ export interface Database {
           usuario_id: string
           nombre: string
           tipo: 'fijo_recurrente' | 'proyecto_recurrente' | 'unico'
-          monto_esperado: number
-          moneda: string
+          es_recurrente: boolean
+          frecuencia: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
+          dia_del_mes: number | null
+          fecha_inicio: string | null
+          fecha_fin: string | null
+          indefinido: boolean
+          monto_fijo: number | null
+          monto_esperado: number | null
+          monto_minimo: number | null
+          monto_maximo: number | null
           fecha_esperada: string | null
           fecha_real: string | null
-          recurrente_dia: number | null
+          monto_real: number | null
           estado: 'confirmado' | 'pendiente' | 'en_riesgo' | 'esperado'
           probabilidad: 'alta' | 'media' | 'baja'
-          notas: string | null
+          cuenta_destino_id: string | null
+          forma_recepcion: string | null
+          concepto_fiscal: string | null
+          requiere_factura: boolean
           created_at: string
           updated_at: string
         }
@@ -166,14 +177,25 @@ export interface Database {
           usuario_id: string
           nombre: string
           tipo: 'fijo_recurrente' | 'proyecto_recurrente' | 'unico'
-          monto_esperado: number
-          moneda?: string
+          es_recurrente?: boolean
+          frecuencia?: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
+          dia_del_mes?: number | null
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          indefinido?: boolean
+          monto_fijo?: number | null
+          monto_esperado?: number | null
+          monto_minimo?: number | null
+          monto_maximo?: number | null
           fecha_esperada?: string | null
           fecha_real?: string | null
-          recurrente_dia?: number | null
+          monto_real?: number | null
           estado?: 'confirmado' | 'pendiente' | 'en_riesgo' | 'esperado'
           probabilidad?: 'alta' | 'media' | 'baja'
-          notas?: string | null
+          cuenta_destino_id?: string | null
+          forma_recepcion?: string | null
+          concepto_fiscal?: string | null
+          requiere_factura?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -182,14 +204,25 @@ export interface Database {
           usuario_id?: string
           nombre?: string
           tipo?: 'fijo_recurrente' | 'proyecto_recurrente' | 'unico'
-          monto_esperado?: number
-          moneda?: string
+          es_recurrente?: boolean
+          frecuencia?: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
+          dia_del_mes?: number | null
+          fecha_inicio?: string | null
+          fecha_fin?: string | null
+          indefinido?: boolean
+          monto_fijo?: number | null
+          monto_esperado?: number | null
+          monto_minimo?: number | null
+          monto_maximo?: number | null
           fecha_esperada?: string | null
           fecha_real?: string | null
-          recurrente_dia?: number | null
+          monto_real?: number | null
           estado?: 'confirmado' | 'pendiente' | 'en_riesgo' | 'esperado'
           probabilidad?: 'alta' | 'media' | 'baja'
-          notas?: string | null
+          cuenta_destino_id?: string | null
+          forma_recepcion?: string | null
+          concepto_fiscal?: string | null
+          requiere_factura?: boolean
           updated_at?: string
         }
         Relationships: Rel[]
