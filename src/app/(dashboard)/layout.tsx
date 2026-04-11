@@ -9,11 +9,13 @@ import {
   BarChart3,
   Target,
   WalletCards,
+  Landmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/cuentas', label: 'Cuentas', icon: Landmark },
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
   { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
   { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
