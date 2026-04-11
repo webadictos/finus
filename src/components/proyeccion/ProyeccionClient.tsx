@@ -13,6 +13,7 @@ import type { BadgeVariant } from '@/components/shared/Badge'
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type GastoPrevisto = Database['public']['Tables']['gastos_previstos']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ function calcularLimite(dias: number): Date {
 
 interface Props {
   saldoActual: number
+  cuentas: Cuenta[]
   ingresos: Ingreso[]
   compromisos: Compromiso[]
   gastosPrevistos: GastoPrevisto[]
@@ -72,6 +74,7 @@ interface Props {
 
 export default function ProyeccionClient({
   saldoActual,
+  cuentas,
   ingresos,
   compromisos,
   gastosPrevistos,
@@ -89,6 +92,7 @@ export default function ProyeccionClient({
     fechaEnPeriodo(c.fecha_proximo_pago, limite)
   )
   const gastosEnPeriodo = gastosPrevistos.filter((g) => {
+    if (g.realizado) return false
     const fecha = g.fecha_confirmada ?? g.fecha_sugerida
     if (fecha) return fechaEnPeriodo(fecha, limite)
     // Sin fecha: previsto_sin_fecha con mes actual entra siempre
@@ -302,7 +306,7 @@ export default function ProyeccionClient({
         ) : (
           <div className="flex flex-col gap-3">
             {gastosPrevistos.map((g) => (
-              <GastoPrevistoCard key={g.id} gasto={g} />
+              <GastoPrevistoCard key={g.id} gasto={g} cuentas={cuentas} />
             ))}
           </div>
         )}

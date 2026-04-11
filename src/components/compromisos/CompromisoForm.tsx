@@ -99,6 +99,37 @@ interface Props {
   tarjetaIdFijo?: string
 }
 
+// ─── Helpers de frecuencia ────────────────────────────────────────────────────
+
+const FREQ_DIVISOR: Record<string, number> = {
+  mensual: 30,
+  quincenal: 15,
+  semanal: 7,
+  anual: 365,
+}
+
+function calcFechaFin(fechaInicio: string, pagos: number, frecuencia: string): string {
+  const base = new Date(fechaInicio + 'T12:00:00')
+  if (frecuencia === 'mensual') {
+    base.setMonth(base.getMonth() + (pagos - 1))
+  } else if (frecuencia === 'anual') {
+    base.setFullYear(base.getFullYear() + (pagos - 1))
+  } else {
+    base.setDate(base.getDate() + (pagos - 1) * (FREQ_DIVISOR[frecuencia] ?? 30))
+  }
+  return base.toISOString().split('T')[0]
+}
+
+function calcPagosRestantes(fechaInicio: string, fechaFin: string, frecuencia: string): number {
+  const inicio = new Date(fechaInicio + 'T12:00:00')
+  const fin = new Date(fechaFin + 'T12:00:00')
+  const dias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+  const divisor = FREQ_DIVISOR[frecuencia] ?? 30
+  return Math.max(1, Math.ceil((dias + 1) / divisor))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function CompromisoForm({ open, onOpenChange, compromiso, tarjetas, tarjetaIdFijo }: Props) {
   const [form, setForm] = useState<FormState>(() => {
     const base = initialForm(compromiso)
@@ -122,27 +153,29 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
     const value = e.target.value
     setForm((p) => {
       const next = { ...p, [key]: value }
+      // Frequency to use for calculations — updated if frecuencia is the changing field
+      const freq = key === 'frecuencia' ? value : next.frecuencia
 
-      // Mutual calculation between mensualidades_restantes and fecha_fin_estimada
+      // pagos → fecha_fin
       if (key === 'mensualidades_restantes' && next.fecha_proximo_pago) {
         const n = parseInt(value)
         if (!isNaN(n) && n > 0) {
-          const base = new Date(next.fecha_proximo_pago + 'T12:00:00')
-          base.setMonth(base.getMonth() + (n - 1))
-          next.fecha_fin_estimada = base.toISOString().split('T')[0]
+          next.fecha_fin_estimada = calcFechaFin(next.fecha_proximo_pago, n, freq)
         } else {
           next.fecha_fin_estimada = ''
         }
       }
 
+      // fecha_fin → pagos
       if (key === 'fecha_fin_estimada' && value && next.fecha_proximo_pago) {
-        const inicio = new Date(next.fecha_proximo_pago + 'T12:00:00')
-        const fin = new Date(value + 'T12:00:00')
-        const meses =
-          (fin.getFullYear() - inicio.getFullYear()) * 12 +
-          (fin.getMonth() - inicio.getMonth()) +
-          1
-        next.mensualidades_restantes = meses > 0 ? String(meses) : ''
+        const pagos = calcPagosRestantes(next.fecha_proximo_pago, value, freq)
+        next.mensualidades_restantes = String(pagos)
+      }
+
+      // frecuencia → recalculate pagos from fecha_fin if both dates exist
+      if (key === 'frecuencia' && next.fecha_fin_estimada && next.fecha_proximo_pago) {
+        const pagos = calcPagosRestantes(next.fecha_proximo_pago, next.fecha_fin_estimada, value)
+        next.mensualidades_restantes = String(pagos)
       }
 
       return next
@@ -185,20 +218,17 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
     if (!form.mensualidades_restantes || !form.fecha_proximo_pago) return null
     const n = parseInt(form.mensualidades_restantes)
     if (isNaN(n) || n <= 0) return null
-    const base = new Date(form.fecha_proximo_pago + 'T12:00:00')
-    base.setMonth(base.getMonth() + (n - 1))
-    return base.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+    const fechaStr = calcFechaFin(form.fecha_proximo_pago, n, form.frecuencia)
+    return new Date(fechaStr + 'T12:00:00').toLocaleDateString('es-MX', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
   })()
 
-  const mensualidadesCalculadas = (() => {
+  const pagosCalculados = (() => {
     if (!form.fecha_fin_estimada || !form.fecha_proximo_pago) return null
-    const inicio = new Date(form.fecha_proximo_pago + 'T12:00:00')
-    const fin = new Date(form.fecha_fin_estimada + 'T12:00:00')
-    const meses =
-      (fin.getFullYear() - inicio.getFullYear()) * 12 +
-      (fin.getMonth() - inicio.getMonth()) +
-      1
-    return meses > 0 ? meses : null
+    return calcPagosRestantes(form.fecha_proximo_pago, form.fecha_fin_estimada, form.frecuencia)
   })()
 
   const selectClass =
@@ -310,7 +340,7 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                   </p>
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="mensualidades_restantes">Mensualidades restantes</Label>
+                      <Label htmlFor="mensualidades_restantes">Pagos restantes</Label>
                       <Input
                         id="mensualidades_restantes"
                         type="number"
@@ -334,9 +364,9 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                         value={form.fecha_fin_estimada}
                         onChange={set('fecha_fin_estimada')}
                       />
-                      {mensualidadesCalculadas !== null && !form.mensualidades_restantes && (
+                      {pagosCalculados !== null && !form.mensualidades_restantes && (
                         <p className="text-xs text-muted-foreground">
-                          Mensualidades calculadas: <span className="font-medium text-foreground">{mensualidadesCalculadas}</span>
+                          Pagos calculados: <span className="font-medium text-foreground">{pagosCalculados}</span>
                         </p>
                       )}
                     </div>

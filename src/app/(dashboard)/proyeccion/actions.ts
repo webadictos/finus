@@ -73,6 +73,105 @@ export async function actualizarGastoPrevisto(
   return {}
 }
 
+export async function confirmarGastoPrevisto(
+  id: string,
+  montoReal: number,
+  cuentaId: string | null,
+  formaPago: string | null
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { data: previsto, error: fetchErr } = await supabase
+    .from('gastos_previstos')
+    .select('nombre, monto_estimado')
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchErr || !previsto) return { error: 'Gasto previsto no encontrado' }
+
+  const hoy = new Date().toISOString().split('T')[0]
+  const monto = montoReal > 0 ? montoReal : Number(previsto.monto_estimado ?? 0)
+  const cuentaEfectiva =
+    formaPago && ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null
+
+  const { data: tx, error: txErr } = await supabase
+    .from('transacciones')
+    .insert({
+      usuario_id: user.id,
+      tipo: 'gasto',
+      monto,
+      fecha: hoy,
+      descripcion: previsto.nombre,
+      cuenta_id: cuentaEfectiva,
+      forma_pago: formaPago || null,
+      es_recurrente: false,
+    })
+    .select('id')
+    .single()
+
+  if (txErr || !tx) return { error: txErr?.message ?? 'Error al crear transacción' }
+
+  const { error: updateErr } = await supabase
+    .from('gastos_previstos')
+    .update({
+      realizado: true,
+      monto_real: montoReal > 0 ? montoReal : null,
+      fecha_confirmada: hoy,
+      transaccion_id: tx.id,
+    })
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (updateErr) return { error: updateErr.message }
+
+  if (cuentaEfectiva) {
+    await supabase.rpc('decrementar_saldo', {
+      p_cuenta_id: cuentaEfectiva,
+      p_monto: monto,
+    })
+  }
+
+  revalidatePath('/proyeccion')
+  revalidatePath('/gastos')
+  revalidatePath('/')
+  return {}
+}
+
+export async function vincularGastoPrevisto(
+  previsto_id: string,
+  transaccion_id: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  const { error } = await supabase
+    .from('gastos_previstos')
+    .update({
+      realizado: true,
+      transaccion_id,
+      fecha_confirmada: hoy,
+    })
+    .eq('id', previsto_id)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/proyeccion')
+  revalidatePath('/gastos')
+  revalidatePath('/')
+  return {}
+}
+
 export async function confirmarFechaGasto(
   id: string,
   fechaConfirmada: string,

@@ -341,6 +341,7 @@ export interface Database {
           monto_real: number | null
           notas: string | null
           activo: boolean
+          transaccion_id: string | null
           created_at: string
           updated_at: string
         }
@@ -361,6 +362,7 @@ export interface Database {
           monto_real?: number | null
           notas?: string | null
           activo?: boolean
+          transaccion_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -381,6 +383,7 @@ export interface Database {
           monto_real?: number | null
           notas?: string | null
           activo?: boolean
+          transaccion_id?: string | null
           updated_at?: string
         }
         Relationships: Rel[]

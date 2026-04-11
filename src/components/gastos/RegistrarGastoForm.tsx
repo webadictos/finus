@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
+import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -86,9 +87,11 @@ interface Props {
   tarjetas: Tarjeta[]
   /** Si se pasa, el form entra en modo edición */
   transaccion?: Transaccion | null
+  /** Llamado tras guardar exitosamente un nuevo gasto */
+  onSave?: (data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) => void
 }
 
-export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, transaccion }: Props) {
+export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, transaccion, onSave }: Props) {
   const isEditing = !!transaccion
   const [form, setForm] = useState<FormState>(() => initialForm(transaccion))
   const [error, setError] = useState<string | null>(null)
@@ -123,15 +126,28 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
     }
 
     startTransition(async () => {
-      const result = isEditing
-        ? await actualizarGasto(transaccion!.id, fd)
-        : await registrarGasto(fd)
-      if (result.error) {
-        setError(result.error)
+      if (isEditing) {
+        const result = await actualizarGasto(transaccion!.id, fd)
+        if (result.error) {
+          setError(result.error)
+        } else {
+          setForm(initialForm(transaccion))
+          setError(null)
+          onOpenChange(false)
+        }
       } else {
-        setForm(initialForm(transaccion))
-        setError(null)
-        onOpenChange(false)
+        const result = await registrarGasto(fd)
+        if (result.error) {
+          setError(result.error)
+        } else {
+          setForm(initialForm(null))
+          setError(null)
+          onOpenChange(false)
+          onSave?.({
+            previstosCoincidentes: result.previstosCoincidentes,
+            transaccionId: result.transaccionId,
+          })
+        }
       }
     })
   }

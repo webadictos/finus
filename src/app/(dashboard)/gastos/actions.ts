@@ -5,7 +5,14 @@ import { revalidatePath } from 'next/cache'
 
 export type ActionResult = { error?: string }
 
-export async function registrarGasto(formData: FormData): Promise<ActionResult> {
+export type PrevistoBasico = { id: string; nombre: string; monto_estimado: number }
+export type RegistrarGastoResult = {
+  error?: string
+  previstosCoincidentes?: PrevistoBasico[]
+  transaccionId?: string
+}
+
+export async function registrarGasto(formData: FormData): Promise<RegistrarGastoResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -18,20 +25,26 @@ export async function registrarGasto(formData: FormData): Promise<ActionResult> 
   const mesesMsi = formData.get('meses_msi')
   const fecha = (formData.get('fecha') as string) || new Date().toISOString().split('T')[0]
 
-  const { error } = await supabase.from('transacciones').insert({
-    usuario_id: user.id,
-    tipo: 'gasto',
-    monto: parseFloat(formData.get('monto') as string) || 0,
-    fecha,
-    descripcion: ((formData.get('descripcion') as string) || '').trim() || null,
-    categoria: (formData.get('categoria') as string) || null,
-    forma_pago: formaPago || null,
-    cuenta_id: ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null,
-    tarjeta_id: ['credito_revolvente', 'msi'].includes(formaPago) ? tarjetaId : null,
-    meses_msi: formaPago === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
-    notas: ((formData.get('notas') as string) || '').trim() || null,
-    es_recurrente: false,
-  })
+  const monto = parseFloat(formData.get('monto') as string) || 0
+
+  const { data: nuevaTx, error } = await supabase
+    .from('transacciones')
+    .insert({
+      usuario_id: user.id,
+      tipo: 'gasto',
+      monto,
+      fecha,
+      descripcion: ((formData.get('descripcion') as string) || '').trim() || null,
+      categoria: (formData.get('categoria') as string) || null,
+      forma_pago: formaPago || null,
+      cuenta_id: ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null,
+      tarjeta_id: ['credito_revolvente', 'msi'].includes(formaPago) ? tarjetaId : null,
+      meses_msi: formaPago === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
+      notas: ((formData.get('notas') as string) || '').trim() || null,
+      es_recurrente: false,
+    })
+    .select('id')
+    .single()
 
   if (error) return { error: error.message }
 
@@ -40,13 +53,28 @@ export async function registrarGasto(formData: FormData): Promise<ActionResult> 
   if (cuentaEfectiva) {
     await supabase.rpc('decrementar_saldo', {
       p_cuenta_id: cuentaEfectiva,
-      p_monto: parseFloat(formData.get('monto') as string) || 0,
+      p_monto: monto,
     })
   }
 
+  // Buscar gastos previstos activos no realizados para sugerir vinculación
+  const { data: previstos } = await supabase
+    .from('gastos_previstos')
+    .select('id, nombre, monto_estimado')
+    .eq('usuario_id', user.id)
+    .eq('activo', true)
+    .eq('realizado', false)
+
   revalidatePath('/gastos')
   revalidatePath('/')
-  return {}
+  return {
+    previstosCoincidentes: (previstos ?? []).map((p) => ({
+      id: p.id,
+      nombre: p.nombre,
+      monto_estimado: Number(p.monto_estimado ?? 0),
+    })),
+    transaccionId: nuevaTx?.id,
+  }
 }
 
 export async function actualizarGasto(

@@ -12,7 +12,7 @@ export default async function ProyeccionPage() {
   const [cuentasRes, ingresosRes, compromisosRes, gastosRes] = await Promise.all([
     supabase
       .from('cuentas')
-      .select('saldo_actual, tipo')
+      .select('*')
       .eq('usuario_id', user.id)
       .eq('activa', true)
       .neq('tipo', 'inversion'),
@@ -52,6 +52,7 @@ export default async function ProyeccionPage() {
 
       <ProyeccionClient
         saldoActual={saldoActual}
+        cuentas={cuentasRes.data ?? []}
         ingresos={ingresosRes.data ?? []}
         compromisos={compromisosRes.data ?? []}
         gastosPrevistos={gastosRes.data ?? []}

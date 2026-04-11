@@ -29,6 +29,7 @@ export async function crearCompromiso(formData: FormData): Promise<ActionResult>
     usuario_id: user.id,
     nombre: (formData.get('nombre') as string).trim(),
     tipo_pago,
+    frecuencia: ((formData.get('frecuencia') as string) || null) as 'mensual' | 'quincenal' | 'semanal' | 'anual' | null,
     monto_mensualidad:
       parseFloat(formData.get('monto_mensualidad') as string) || null,
     fecha_proximo_pago: (formData.get('fecha_proximo_pago') as string) || null,
@@ -80,6 +81,7 @@ export async function actualizarCompromiso(
     .update({
       nombre: (formData.get('nombre') as string).trim(),
       tipo_pago,
+      frecuencia: ((formData.get('frecuencia') as string) || null) as 'mensual' | 'quincenal' | 'semanal' | 'anual' | null,
       monto_mensualidad:
         parseFloat(formData.get('monto_mensualidad') as string) || null,
       fecha_proximo_pago: (formData.get('fecha_proximo_pago') as string) || null,

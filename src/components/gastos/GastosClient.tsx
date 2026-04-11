@@ -6,8 +6,10 @@ import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import GastoCard from '@/components/gastos/GastoCard'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
+import VincularPrevistoModal from '@/components/gastos/VincularPrevistoModal'
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
+import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -92,9 +94,18 @@ interface Props {
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
+type Sugerencia = { previstos: PrevistoBasico[]; transaccionId: string }
+
 export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: Props) {
   const [formOpen, setFormOpen] = useState(false)
+  const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null)
   const router = useRouter()
+
+  function handleSave(data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) {
+    if (data.previstosCoincidentes && data.previstosCoincidentes.length > 0 && data.transaccionId) {
+      setSugerencia({ previstos: data.previstosCoincidentes, transaccionId: data.transaccionId })
+    }
+  }
 
   const now = new Date()
   const currentMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -232,7 +243,17 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: 
         onOpenChange={setFormOpen}
         cuentas={cuentas}
         tarjetas={tarjetas}
+        onSave={handleSave}
       />
+
+      {sugerencia && (
+        <VincularPrevistoModal
+          open={!!sugerencia}
+          onOpenChange={(open) => { if (!open) setSugerencia(null) }}
+          transaccionId={sugerencia.transaccionId}
+          previstos={sugerencia.previstos}
+        />
+      )}
     </div>
   )
 }
