@@ -19,13 +19,13 @@ export async function crearCuenta(formData: FormData): Promise<ActionResult> {
     usuario_id: user.id,
     nombre: (formData.get('nombre') as string).trim(),
     tipo: formData.get('tipo') as 'banco' | 'efectivo' | 'digital' | 'inversion',
+    moneda: (formData.get('moneda') as string)?.trim() || 'MXN',
     tiene_tarjeta_debito: tieneTarjeta,
     ultimos_4_debito: tieneTarjeta ? ultimos4 : null,
     color: (formData.get('color') as string)?.trim() || null,
     icono: (formData.get('icono') as string)?.trim() || null,
     activa: true,
     // saldo_actual omitido — tiene DEFAULT 0 en BD
-    // moneda omitida — DEFAULT 'MXN' en BD
   })
 
   if (error) return { error: error.message }
@@ -54,6 +54,7 @@ export async function actualizarCuenta(
     .update({
       nombre: (formData.get('nombre') as string).trim(),
       tipo: formData.get('tipo') as 'banco' | 'efectivo' | 'digital' | 'inversion',
+      moneda: (formData.get('moneda') as string)?.trim() || 'MXN',
       tiene_tarjeta_debito: tieneTarjeta,
       ultimos_4_debito: tieneTarjeta ? ultimos4 : null,
       color: (formData.get('color') as string)?.trim() || null,

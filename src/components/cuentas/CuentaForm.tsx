@@ -21,6 +21,7 @@ const TIPO_OPTIONS = [
 interface FormState {
   nombre: string
   tipo: string
+  moneda: string
   color: string
   icono: string
   tiene_tarjeta_debito: boolean
@@ -32,6 +33,7 @@ function initialForm(cuenta?: Cuenta | null, tipoDefault?: string): FormState {
     return {
       nombre: '',
       tipo: tipoDefault ?? 'banco',
+      moneda: 'MXN',
       color: '',
       icono: '',
       tiene_tarjeta_debito: false,
@@ -41,6 +43,7 @@ function initialForm(cuenta?: Cuenta | null, tipoDefault?: string): FormState {
   return {
     nombre: cuenta.nombre,
     tipo: cuenta.tipo,
+    moneda: cuenta.moneda,
     color: cuenta.color ?? '',
     icono: cuenta.icono ?? '',
     tiene_tarjeta_debito: cuenta.tiene_tarjeta_debito,
@@ -87,6 +90,7 @@ export default function CuentaForm({ open, onOpenChange, cuenta, tipoDefault }: 
     const fd = new FormData()
     fd.append('nombre', form.nombre)
     fd.append('tipo', form.tipo)
+    fd.append('moneda', form.moneda || 'MXN')
     fd.append('tiene_tarjeta_debito', form.tiene_tarjeta_debito ? 'true' : 'false')
     if (form.tiene_tarjeta_debito && form.ultimos_4_debito)
       fd.append('ultimos_4_debito', form.ultimos_4_debito)
@@ -163,6 +167,17 @@ export default function CuentaForm({ open, onOpenChange, cuenta, tipoDefault }: 
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Moneda */}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="moneda">Moneda</Label>
+                <Input
+                  id="moneda"
+                  placeholder="MXN"
+                  value={form.moneda}
+                  onChange={set('moneda')}
+                />
               </div>
 
               {/* Tarjeta débito */}
