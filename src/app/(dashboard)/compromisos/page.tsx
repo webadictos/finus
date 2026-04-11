@@ -162,7 +162,11 @@ export default async function CompromisosPage() {
                         </span>
                       </span>
                     )}
-                    {tarjeta && <EditarTarjetaButton tarjeta={tarjeta} />}
+                    {tarjeta ? (
+                      <EditarTarjetaButton tarjeta={tarjeta} />
+                    ) : (
+                      <NuevoCompromisoButton tarjetas={tarjetas} />
+                    )}
                   </div>
                 </div>
 
@@ -193,7 +197,6 @@ export default async function CompromisosPage() {
                     <p className="text-sm text-muted-foreground">
                       {tarjeta ? 'Sin compromisos aún' : 'Sin compromisos directos'}
                     </p>
-                    {!tarjeta && <NuevoCompromisoButton tarjetas={tarjetas} />}
                   </div>
                 ) : (
                   lista.map((c) => (
@@ -208,15 +211,13 @@ export default async function CompromisosPage() {
                   ))
                 )}
 
-                {/* Acción al pie */}
-                {tarjeta ? (
+                {/* Acción al pie — solo grupos con tarjeta */}
+                {tarjeta && (
                   <AgregarCompromisoTarjetaButton
                     tarjetaId={tarjeta.id}
                     tarjetas={tarjetas}
                   />
-                ) : lista.length > 0 ? (
-                  <NuevoCompromisoButton tarjetas={tarjetas} />
-                ) : null}
+                )}
               </div>
             )
           })}
