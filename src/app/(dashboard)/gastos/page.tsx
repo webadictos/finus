@@ -2,16 +2,29 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import GastosClient from '@/components/gastos/GastosClient'
 
-export default async function GastosPage() {
+interface Props {
+  searchParams: Promise<{ mes?: string }>
+}
+
+export default async function GastosPage({ searchParams }: Props) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { mes } = await searchParams
+
+  // Validar formato YYYY-MM o usar mes actual
   const now = new Date()
-  const firstDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
-  const today = now.toISOString().split('T')[0]
+  const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const mesFinal = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : defaultMes
+
+  const [year, month] = mesFinal.split('-').map(Number)
+  const firstDay = `${mesFinal}-01`
+  // Último día del mes: día 0 del mes siguiente
+  const lastDayDate = new Date(year, month, 0)
+  const lastDay = `${mesFinal}-${String(lastDayDate.getDate()).padStart(2, '0')}`
 
   const [transRes, cuentasRes, tarjetasRes] = await Promise.all([
     supabase
@@ -20,7 +33,7 @@ export default async function GastosPage() {
       .eq('usuario_id', user.id)
       .eq('tipo', 'gasto')
       .gte('fecha', firstDay)
-      .lte('fecha', today)
+      .lte('fecha', lastDay)
       .order('fecha', { ascending: false }),
     supabase
       .from('cuentas')
@@ -29,7 +42,6 @@ export default async function GastosPage() {
       .eq('activa', true)
       .neq('tipo', 'inversion')
       .order('nombre', { ascending: true }),
-
     supabase
       .from('tarjetas')
       .select('*')
@@ -43,7 +55,7 @@ export default async function GastosPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Gastos</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Registro de gastos del mes actual
+          Registro de gastos por período
         </p>
       </div>
 
@@ -51,6 +63,7 @@ export default async function GastosPage() {
         transacciones={transRes.data ?? []}
         cuentas={cuentasRes.data ?? []}
         tarjetas={tarjetasRes.data ?? []}
+        mes={mesFinal}
       />
     </div>
   )

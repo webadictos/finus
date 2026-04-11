@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Receipt } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import GastoCard from '@/components/gastos/GastoCard'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
@@ -47,6 +48,29 @@ function fechaLabel(fecha: string): string {
   })
 }
 
+/** "YYYY-MM" → "Abril 2026" */
+function mesLabel(mes: string): string {
+  const [year, month] = mes.split('-').map(Number)
+  return new Date(year, month - 1, 1).toLocaleDateString('es-MX', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+/** "YYYY-MM" → mes anterior "YYYY-MM" */
+function mesPrevio(mes: string): string {
+  const [year, month] = mes.split('-').map(Number)
+  const d = new Date(year, month - 2, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** "YYYY-MM" → mes siguiente "YYYY-MM" */
+function mesSiguiente(mes: string): string {
+  const [year, month] = mes.split('-').map(Number)
+  const d = new Date(year, month, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 // ─── KPI helpers ─────────────────────────────────────────────────────────────
 
 const FORMA_PAGO_LABEL: Record<string, string> = {
@@ -63,12 +87,22 @@ interface Props {
   transacciones: Transaccion[]
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  mes: string
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
-export default function GastosClient({ transacciones, cuentas, tarjetas }: Props) {
+export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: Props) {
   const [formOpen, setFormOpen] = useState(false)
+  const router = useRouter()
+
+  const now = new Date()
+  const currentMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const esMesActual = mes === currentMes
+
+  function navegar(destino: string) {
+    router.push(`/gastos?mes=${destino}`)
+  }
 
   // Build tarjetas map for card display
   const tarjetasMap = new Map(tarjetas.map((t) => [t.id, t.nombre]))
@@ -87,11 +121,33 @@ export default function GastosClient({ transacciones, cuentas, tarjetas }: Props
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Selector de período */}
+      <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
+        <button
+          onClick={() => navegar(mesPrevio(mes))}
+          className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          aria-label="Mes anterior"
+        >
+          <ChevronLeft className="size-4" />
+        </button>
+
+        <span className="text-sm font-semibold capitalize">{mesLabel(mes)}</span>
+
+        <button
+          onClick={() => navegar(mesSiguiente(mes))}
+          disabled={esMesActual}
+          className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Mes siguiente"
+        >
+          <ChevronRight className="size-4" />
+        </button>
+      </div>
+
       {/* KPIs */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card px-5 py-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-            Total este mes
+            Total del período
           </p>
           <p className="text-2xl font-bold tabular-nums text-destructive">
             {formatMXN(totalMes)}
@@ -125,7 +181,7 @@ export default function GastosClient({ transacciones, cuentas, tarjetas }: Props
       {/* Header con botón */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Transacciones del mes
+          Transacciones
         </h2>
         <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
           <Plus className="size-3.5" />
@@ -137,14 +193,16 @@ export default function GastosClient({ transacciones, cuentas, tarjetas }: Props
       {transacciones.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
           <Receipt className="size-8 text-muted-foreground/40" />
-          <p className="text-sm font-medium">Sin gastos este mes</p>
+          <p className="text-sm font-medium">Sin gastos en este período</p>
           <p className="text-xs text-muted-foreground">
-            Registra tus gastos para llevar un control detallado
+            No hay gastos registrados para {mesLabel(mes)}
           </p>
-          <Button size="sm" variant="outline" className="mt-2" onClick={() => setFormOpen(true)}>
-            <Plus className="size-3.5" />
-            Registrar primer gasto
-          </Button>
+          {esMesActual && (
+            <Button size="sm" variant="outline" className="mt-2" onClick={() => setFormOpen(true)}>
+              <Plus className="size-3.5" />
+              Registrar primer gasto
+            </Button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-5">
