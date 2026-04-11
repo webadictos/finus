@@ -124,9 +124,6 @@ export default async function CompromisosPage() {
       ) : (
         <div className="flex flex-col gap-8">
           {grupos.map(({ tarjeta, compromisos: lista }) => {
-            // Omitir el grupo "Sin tarjeta" si está vacío y hay tarjetas
-            if (!tarjeta && lista.length === 0) return null
-
             const totalEstimado = lista.reduce(
               (s, c) => s + Number(c.monto_mensualidad ?? 0),
               0
@@ -192,9 +189,12 @@ export default async function CompromisosPage() {
 
                 {/* Cards o estado vacío */}
                 {lista.length === 0 ? (
-                  <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                    Sin compromisos aún
-                  </p>
+                  <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-6 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {tarjeta ? 'Sin compromisos aún' : 'Sin compromisos directos'}
+                    </p>
+                    {!tarjeta && <NuevoCompromisoButton tarjetas={tarjetas} />}
+                  </div>
                 ) : (
                   lista.map((c) => (
                     <CompromisoCard
@@ -214,9 +214,9 @@ export default async function CompromisosPage() {
                     tarjetaId={tarjeta.id}
                     tarjetas={tarjetas}
                   />
-                ) : (
+                ) : lista.length > 0 ? (
                   <NuevoCompromisoButton tarjetas={tarjetas} />
-                )}
+                ) : null}
               </div>
             )
           })}

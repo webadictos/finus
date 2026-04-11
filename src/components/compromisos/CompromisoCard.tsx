@@ -37,6 +37,7 @@ const TIPO_PAGO_LABEL: Record<string, string> = {
   revolvente: 'Revolvente',
   msi: 'MSI',
   prestamo: 'Préstamo',
+  suscripcion: 'Suscripción',
   disposicion_efectivo: 'Efectivo',
 }
 
@@ -45,6 +46,7 @@ const TIPO_PAGO_VARIANT: Record<string, BadgeVariant> = {
   revolvente: 'purple',
   msi: 'info',
   prestamo: 'orange',
+  suscripcion: 'success',
   disposicion_efectivo: 'error',
 }
 

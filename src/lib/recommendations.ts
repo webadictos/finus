@@ -353,6 +353,9 @@ export function getRecomendacion(
     case 'disposicion_efectivo':
       return recomendarDisposicion(compromiso, saldoDisponible)
 
+    case 'suscripcion':
+      return recomendarFijo(compromiso, saldoDisponible)
+
     default: {
       const _exhaustive: never = compromiso.tipo_pago
       throw new Error(`Tipo de pago no reconocido: ${_exhaustive}`)

@@ -248,7 +248,10 @@ export interface Database {
           tarjeta_id: string | null
           nombre: string
           categoria: string | null
-          tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
+          // ⚠️ 'suscripcion' requiere migración: ALTER TYPE tipo_pago ADD VALUE 'suscripcion';
+          tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'suscripcion' | 'disposicion_efectivo'
+          // ⚠️ frecuencia requiere migración: ALTER TABLE compromisos ADD COLUMN frecuencia text;
+          frecuencia: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
           monto_mensualidad: number | null
           fecha_proximo_pago: string | null
           mensualidades_restantes: number | null
@@ -273,7 +276,8 @@ export interface Database {
           tarjeta_id?: string | null
           nombre: string
           categoria?: string | null
-          tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
+          tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'suscripcion' | 'disposicion_efectivo'
+          frecuencia?: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
           monto_mensualidad?: number | null
           fecha_proximo_pago?: string | null
           mensualidades_restantes?: number | null
@@ -298,7 +302,8 @@ export interface Database {
           tarjeta_id?: string | null
           nombre?: string
           categoria?: string | null
-          tipo_pago?: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
+          tipo_pago?: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'suscripcion' | 'disposicion_efectivo'
+          frecuencia?: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
           monto_mensualidad?: number | null
           fecha_proximo_pago?: string | null
           mensualidades_restantes?: number | null

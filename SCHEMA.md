@@ -125,7 +125,8 @@
 | tarjeta_id | uuid\|null | FK → tarjetas |
 | nombre | text | |
 | categoria | text\|null | |
-| tipo_pago | enum | `fijo \| revolvente \| msi \| prestamo \| disposicion_efectivo` |
+| tipo_pago | enum | `fijo \| revolvente \| msi \| prestamo \| disposicion_efectivo \| suscripcion` — ⚠️ `suscripcion` requiere: `ALTER TYPE tipo_pago ADD VALUE 'suscripcion';` |
+| frecuencia | enum\|null | `mensual \| quincenal \| semanal \| anual` — ⚠️ requiere: `ALTER TABLE compromisos ADD COLUMN frecuencia text;` |
 | **monto_mensualidad** | numeric\|null | ⚠️ NO `msi_mensualidad` |
 | **fecha_proximo_pago** | date\|null | ⚠️ NO `fecha_vencimiento` |
 | **mensualidades_restantes** | int\|null | ⚠️ NO `msi_mensualidades` |

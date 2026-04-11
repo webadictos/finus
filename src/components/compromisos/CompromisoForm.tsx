@@ -14,11 +14,19 @@ type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 
 const TIPO_PAGO_OPTIONS: { value: TipoPago; label: string }[] = [
-  { value: 'fijo', label: 'Pago fijo' },
-  { value: 'revolvente', label: 'Tarjeta crédito (revolvente)' },
-  { value: 'msi', label: 'Meses sin intereses (MSI)' },
-  { value: 'prestamo', label: 'Préstamo' },
-  { value: 'disposicion_efectivo', label: 'Disposición de efectivo' },
+  { value: 'fijo', label: 'Pago fijo — monto que no cambia (Telmex, renta, seguro)' },
+  { value: 'revolvente', label: 'Tarjeta revolvente — saldo con intereses' },
+  { value: 'msi', label: 'Meses sin intereses — mensualidad fija obligatoria' },
+  { value: 'prestamo', label: 'Préstamo — cuota fija hasta liquidar' },
+  { value: 'suscripcion', label: 'Suscripción — cobro automático recurrente (Netflix, Spotify, Claude)' },
+  { value: 'disposicion_efectivo', label: 'Disposición de efectivo — intereses desde día 1' },
+]
+
+const FRECUENCIA_OPTIONS = [
+  { value: 'mensual', label: 'Mensual' },
+  { value: 'quincenal', label: 'Quincenal' },
+  { value: 'semanal', label: 'Semanal' },
+  { value: 'anual', label: 'Anual' },
 ]
 
 const PRIORIDAD_OPTIONS = [
@@ -30,6 +38,7 @@ const PRIORIDAD_OPTIONS = [
 interface FormState {
   nombre: string
   tipo_pago: TipoPago
+  frecuencia: string
   monto_mensualidad: string
   fecha_proximo_pago: string
   mensualidades_restantes: string
@@ -46,6 +55,7 @@ function initialForm(c?: Compromiso | null): FormState {
     return {
       nombre: '',
       tipo_pago: 'fijo',
+      frecuencia: 'mensual',
       monto_mensualidad: '',
       fecha_proximo_pago: '',
       mensualidades_restantes: '',
@@ -60,6 +70,7 @@ function initialForm(c?: Compromiso | null): FormState {
   return {
     nombre: c.nombre,
     tipo_pago: c.tipo_pago,
+    frecuencia: c.frecuencia ?? 'mensual',
     monto_mensualidad: c.monto_mensualidad != null ? String(Number(c.monto_mensualidad)) : '',
     fecha_proximo_pago: c.fecha_proximo_pago ?? '',
     mensualidades_restantes: c.mensualidades_restantes != null ? String(c.mensualidades_restantes) : '',
@@ -172,9 +183,9 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                 />
               </div>
 
-              {/* Tipo de pago */}
+              {/* Tipo de compromiso */}
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="tipo_pago">Tipo de pago</Label>
+                <Label htmlFor="tipo_pago">Tipo de compromiso</Label>
                 <select
                   id="tipo_pago"
                   value={form.tipo_pago}
@@ -183,6 +194,23 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                   required
                 >
                   {TIPO_PAGO_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Frecuencia */}
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="frecuencia">Frecuencia</Label>
+                <select
+                  id="frecuencia"
+                  value={form.frecuencia}
+                  onChange={set('frecuencia')}
+                  className={selectClass}
+                >
+                  {FRECUENCIA_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>

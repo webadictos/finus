@@ -10,7 +10,8 @@ export type TipoIngreso = 'fijo_recurrente' | 'proyecto_recurrente' | 'unico'
 
 export type EstadoIngreso = 'confirmado' | 'pendiente' | 'en_riesgo'
 
-export type TipoPago = 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
+// ⚠️ 'suscripcion' requiere migración: ALTER TYPE tipo_pago ADD VALUE 'suscripcion';
+export type TipoPago = 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'suscripcion' | 'disposicion_efectivo'
 
 export type TipoProgramacion = 'recurrente_aprox' | 'previsto_sin_fecha' | 'eventual'
 
