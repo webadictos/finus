@@ -124,6 +124,7 @@ export default function GastoPrevistoCard({ gasto }: Props) {
         gastoId={gasto.id}
         nombre={gasto.nombre}
         fechaSugerida={gasto.fecha_sugerida}
+        certeza={gasto.certeza}
       />
     </>
   )

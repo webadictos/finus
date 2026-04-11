@@ -14,6 +14,7 @@ interface Props {
   gastoId: string
   nombre: string
   fechaSugerida: string | null
+  certeza?: 'alta' | 'media' | 'baja'
 }
 
 export default function ConfirmarFechaModal({
@@ -22,17 +23,22 @@ export default function ConfirmarFechaModal({
   gastoId,
   nombre,
   fechaSugerida,
+  certeza,
 }: Props) {
   const [fecha, setFecha] = useState(
     fechaSugerida ?? new Date().toISOString().split('T')[0]
   )
+  const [montoReal, setMontoReal] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+  const esVariable = certeza === 'media' || certeza === 'baja'
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setFecha(fechaSugerida ?? new Date().toISOString().split('T')[0])
+      setMontoReal('')
       setError(null)
       setSuccess(false)
     }
@@ -46,13 +52,21 @@ export default function ConfirmarFechaModal({
     }
     setError(null)
 
+    const montoRealNum = montoReal !== '' ? parseFloat(montoReal) : null
+
     startTransition(async () => {
-      const result = await confirmarFechaGasto(gastoId, fecha)
+      const result = await confirmarFechaGasto(gastoId, fecha, montoRealNum)
       if (result.error) {
         setError(result.error)
       } else {
         setSuccess(true)
-        setTimeout(() => onOpenChange(false), 1000)
+        setTimeout(() => {
+          setFecha(fechaSugerida ?? new Date().toISOString().split('T')[0])
+          setMontoReal('')
+          setError(null)
+          setSuccess(false)
+          onOpenChange(false)
+        }, 1000)
       }
     })
   }
@@ -86,14 +100,34 @@ export default function ConfirmarFechaModal({
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-1.5 mb-4">
-                <Label htmlFor="fecha-confirmada">Fecha confirmada</Label>
-                <Input
-                  id="fecha-confirmada"
-                  type="date"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                />
+              <div className="flex flex-col gap-3 mb-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="fecha-confirmada">Fecha confirmada</Label>
+                  <Input
+                    id="fecha-confirmada"
+                    type="date"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                  />
+                </div>
+
+                {esVariable && (
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="monto-real">
+                      Monto real{' '}
+                      <span className="font-normal text-muted-foreground">(opcional — si difiere del estimado)</span>
+                    </Label>
+                    <Input
+                      id="monto-real"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={montoReal}
+                      onChange={(e) => setMontoReal(e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
 
               {error && (

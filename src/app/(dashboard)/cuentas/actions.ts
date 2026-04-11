@@ -138,6 +138,52 @@ export async function actualizarCuenta(
   return {}
 }
 
+export async function ajustarSaldo(
+  cuentaId: string,
+  saldoNuevo: number
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { data: cuenta } = await supabase
+    .from('cuentas')
+    .select('saldo_actual')
+    .eq('id', cuentaId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (!cuenta) return { error: 'Cuenta no encontrada' }
+
+  const saldoActual = Number(cuenta.saldo_actual ?? 0)
+  const delta = saldoNuevo - saldoActual
+
+  if (delta === 0) return {}
+
+  if (delta > 0) {
+    const { error } = await supabase.rpc('incrementar_saldo', {
+      p_cuenta_id: cuentaId,
+      p_monto: delta,
+    })
+    if (error) return { error: error.message }
+  } else {
+    const { error } = await supabase.rpc('decrementar_saldo', {
+      p_cuenta_id: cuentaId,
+      p_monto: Math.abs(delta),
+    })
+    if (error) return { error: error.message }
+  }
+
+  // TODO: registrar transacción tipo 'ajuste' cuando exista el enum en BD
+  // ALTER TYPE transacciones_tipo ADD VALUE 'ajuste';
+
+  revalidatePath('/cuentas')
+  revalidatePath('/')
+  return {}
+}
+
 export async function eliminarCuenta(id: string): Promise<ActionResult> {
   const supabase = await createClient()
   const {

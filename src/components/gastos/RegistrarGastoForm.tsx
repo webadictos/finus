@@ -17,6 +17,7 @@ const CATEGORIA_OPTIONS = [
   { value: 'comida', label: 'Comida' },
   { value: 'gasolina', label: 'Gasolina' },
   { value: 'despensa', label: 'Despensa' },
+  { value: 'casa', label: 'Casa' },
   { value: 'salud', label: 'Salud' },
   { value: 'escuela', label: 'Escuela' },
   { value: 'entretenimiento', label: 'Entretenimiento' },

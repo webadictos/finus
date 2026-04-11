@@ -20,6 +20,15 @@ const TIPO_OPTIONS = [
   { value: 'eventual', label: 'Eventual' },
 ]
 
+const FRECUENCIA_OPTIONS = [
+  { value: '7', label: 'Semanal (7 días)' },
+  { value: '15', label: 'Quincenal (15 días)' },
+  { value: '30', label: 'Mensual (30 días)' },
+  { value: '60', label: 'Bimestral (60 días)' },
+  { value: '90', label: 'Trimestral (90 días)' },
+  { value: '365', label: 'Anual (365 días)' },
+]
+
 const CERTEZA_OPTIONS = [
   { value: 'alta', label: 'Alta' },
   { value: 'media', label: 'Media' },
@@ -97,6 +106,8 @@ export default function GastoPrevistoForm({ open, onOpenChange, gasto }: Props) 
       if (result.error) {
         setError(result.error)
       } else {
+        setForm(initialForm(gasto))
+        setError(null)
         onOpenChange(false)
       }
     })
@@ -189,16 +200,36 @@ export default function GastoPrevistoForm({ open, onOpenChange, gasto }: Props) 
 
               {isRecurrente && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="gp-freq">Frecuencia (días)</Label>
-                  <Input
+                  <Label htmlFor="gp-freq">Frecuencia</Label>
+                  <select
                     id="gp-freq"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="ej. 30 para mensual, 365 para anual"
-                    value={form.frecuencia_dias}
-                    onChange={set('frecuencia_dias')}
-                  />
+                    value={FRECUENCIA_OPTIONS.some((o) => o.value === form.frecuencia_dias) ? form.frecuencia_dias : 'custom'}
+                    onChange={(e) => {
+                      if (e.target.value !== 'custom') {
+                        setForm((p) => ({ ...p, frecuencia_dias: e.target.value }))
+                      } else {
+                        setForm((p) => ({ ...p, frecuencia_dias: '' }))
+                      }
+                    }}
+                    className={selectClass}
+                  >
+                    {FRECUENCIA_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                    <option value="custom">Personalizado</option>
+                  </select>
+                  {!FRECUENCIA_OPTIONS.some((o) => o.value === form.frecuencia_dias) && (
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="Número de días"
+                      value={form.frecuencia_dias}
+                      onChange={set('frecuencia_dias')}
+                    />
+                  )}
                 </div>
               )}
 

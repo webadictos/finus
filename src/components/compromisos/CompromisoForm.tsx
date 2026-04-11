@@ -356,6 +356,19 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                 </div>
               )}
 
+              {/* Fecha de último pago — para tipos que NO tienen bloque liquidación */}
+              {!isMSI && !isPrestamo && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="fecha_fin_estimada_general">Fecha de último pago (opcional)</Label>
+                  <Input
+                    id="fecha_fin_estimada_general"
+                    type="date"
+                    value={form.fecha_fin_estimada}
+                    onChange={set('fecha_fin_estimada')}
+                  />
+                </div>
+              )}
+
               {/* Revolvente: campos adicionales */}
               {isRevolvente && (
                 <>

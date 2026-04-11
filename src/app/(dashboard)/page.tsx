@@ -4,6 +4,7 @@ import SaldoHeader from '@/components/dashboard/SaldoHeader'
 import KPICards from '@/components/dashboard/KPICards'
 import AlertasVencimiento from '@/components/dashboard/AlertasVencimiento'
 import ProximosIngresos from '@/components/dashboard/ProximosIngresos'
+import ProximosGastosPrevistos from '@/components/dashboard/ProximosGastosPrevistos'
 import AconsejameButton from '@/components/dashboard/AconsejameButton'
 import NuevaTransferenciaButton from '@/components/cuentas/NuevaTransferenciaButton'
 import type { Database } from '@/types/database'
@@ -11,6 +12,7 @@ import type { Database } from '@/types/database'
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
+type GastoPrevisto = Database['public']['Tables']['gastos_previstos']['Row']
 
 // Esqueleto simple reutilizable para Suspense
 function CardSkeleton({ className = '' }: { className?: string }) {
@@ -25,7 +27,7 @@ function CardSkeleton({ className = '' }: { className?: string }) {
 async function DashboardData() {
   const supabase = await createClient()
 
-  const [cuentasRes, ingresosRes, compromisosRes] = await Promise.all([
+  const [cuentasRes, ingresosRes, compromisosRes, gastosPrevistoRes] = await Promise.all([
     supabase
       .from('cuentas')
       .select('*')
@@ -40,11 +42,18 @@ async function DashboardData() {
       .select('*')
       .eq('activo', true)
       .order('fecha_proximo_pago', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('gastos_previstos')
+      .select('*')
+      .eq('activo', true)
+      .eq('realizado', false)
+      .order('fecha_sugerida', { ascending: true, nullsFirst: false }),
   ])
 
   const cuentas: Cuenta[] = cuentasRes.data ?? []
   const ingresos: Ingreso[] = ingresosRes.data ?? []
   const compromisos: Compromiso[] = compromisosRes.data ?? []
+  const gastosPrevistos: GastoPrevisto[] = gastosPrevistoRes.data ?? []
 
   // Ingresos confirmados sin cuenta_destino_id: no llamaron incrementar_saldo,
   // por lo que no están reflejados en cuentas.saldo_actual.
@@ -75,6 +84,7 @@ async function DashboardData() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AlertasVencimiento compromisos={compromisos} saldoDisponible={saldoDisponible} />
         <ProximosIngresos ingresos={ingresos} />
+        <ProximosGastosPrevistos gastos={gastosPrevistos} />
       </div>
     </>
   )

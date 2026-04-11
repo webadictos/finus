@@ -75,7 +75,8 @@ export async function actualizarGastoPrevisto(
 
 export async function confirmarFechaGasto(
   id: string,
-  fechaConfirmada: string
+  fechaConfirmada: string,
+  montoReal?: number | null
 ): Promise<ActionResult> {
   const supabase = await createClient()
   const {
@@ -83,9 +84,16 @@ export async function confirmarFechaGasto(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  const updateData: { fecha_confirmada: string; monto_real?: number } = {
+    fecha_confirmada: fechaConfirmada,
+  }
+  if (montoReal != null && montoReal > 0) {
+    updateData.monto_real = montoReal
+  }
+
   const { error } = await supabase
     .from('gastos_previstos')
-    .update({ fecha_confirmada: fechaConfirmada })
+    .update(updateData)
     .eq('id', id)
     .eq('usuario_id', user.id)
 
