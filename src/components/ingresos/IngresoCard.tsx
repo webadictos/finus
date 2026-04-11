@@ -11,6 +11,7 @@ import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 // ─── Display helpers ──────────────────────────────────────────────────────────
 
@@ -43,9 +44,10 @@ const ESTADO_LABEL: Record<string, { label: string; variant: BadgeVariant }> = {
 
 interface Props {
   ingreso: Ingreso
+  cuentas: Cuenta[]
 }
 
-export default function IngresoCard({ ingreso }: Props) {
+export default function IngresoCard({ ingreso, cuentas }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [confirmarOpen, setConfirmarOpen] = useState(false)
 
@@ -158,6 +160,7 @@ export default function IngresoCard({ ingreso }: Props) {
         open={editOpen}
         onOpenChange={setEditOpen}
         ingreso={ingreso}
+        cuentas={cuentas}
       />
 
       {!confirmado && (

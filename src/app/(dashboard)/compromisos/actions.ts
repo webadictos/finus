@@ -99,7 +99,8 @@ export async function actualizarCompromiso(
 
 export async function marcarPagado(
   id: string,
-  montoPagado: number
+  montoPagado: number,
+  cuentaId?: string | null
 ): Promise<ActionResult> {
   const supabase = await createClient()
   const {
@@ -135,9 +136,18 @@ export async function marcarPagado(
     tipo: 'gasto' as const,
     descripcion: `Pago: ${compromiso.nombre}`,
     fecha: hoy,
+    cuenta_id: cuentaId ?? null,
   })
 
   if (txError) return { error: txError.message }
+
+  // Descontar del saldo de la cuenta si se especificó
+  if (cuentaId) {
+    await supabase.rpc('decrementar_saldo', {
+      p_cuenta_id: cuentaId,
+      p_monto: montoPagado,
+    })
+  }
 
   // Avanzar fecha_proximo_pago al mes siguiente
   const { error: updateError } = await supabase

@@ -13,12 +13,21 @@ export default async function IngresosPage() {
   const hoy = new Date()
   const startOfMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
 
-  const { data } = await supabase
-    .from('ingresos')
-    .select('*')
-    .order('fecha_esperada', { ascending: true, nullsFirst: false })
+  const [{ data }, cuentasRes] = await Promise.all([
+    supabase
+      .from('ingresos')
+      .select('*')
+      .order('fecha_esperada', { ascending: true, nullsFirst: false }),
+    supabase
+      .from('cuentas')
+      .select('*')
+      .eq('activa', true)
+      .neq('tipo', 'inversion')
+      .order('nombre', { ascending: true }),
+  ])
 
   const ingresos: Ingreso[] = data ?? []
+  const cuentas = cuentasRes.data ?? []
 
   // Separar en confirmados y pendientes
   const confirmados = ingresos.filter((i) => i.estado === 'confirmado')
@@ -45,7 +54,7 @@ export default async function IngresosPage() {
             Flujo de entradas esperadas y confirmadas
           </p>
         </div>
-        <NuevoIngresoButton />
+        <NuevoIngresoButton cuentas={cuentas} />
       </div>
 
       {/* Resumen */}
@@ -90,7 +99,7 @@ export default async function IngresosPage() {
                 Pendientes ({pendientes.length})
               </h2>
               {pendientes.map((i) => (
-                <IngresoCard key={i.id} ingreso={i} />
+                <IngresoCard key={i.id} ingreso={i} cuentas={cuentas} />
               ))}
             </section>
           )}
@@ -102,7 +111,7 @@ export default async function IngresosPage() {
                 Confirmados ({confirmados.length})
               </h2>
               {confirmados.map((i) => (
-                <IngresoCard key={i.id} ingreso={i} />
+                <IngresoCard key={i.id} ingreso={i} cuentas={cuentas} />
               ))}
             </section>
           )}

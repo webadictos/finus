@@ -10,6 +10,7 @@ import { crearIngreso, actualizarIngreso } from '@/app/(dashboard)/ingresos/acti
 import type { Database } from '@/types/database'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 const TIPO_OPTIONS = [
   { value: 'fijo_recurrente', label: 'Fijo recurrente' },
@@ -38,6 +39,7 @@ interface FormState {
   probabilidad: string
   es_recurrente: boolean
   frecuencia: string
+  cuenta_destino_id: string
 }
 
 function initialForm(i?: Ingreso | null): FormState {
@@ -50,6 +52,7 @@ function initialForm(i?: Ingreso | null): FormState {
       probabilidad: 'alta',
       es_recurrente: false,
       frecuencia: 'mensual',
+      cuenta_destino_id: '',
     }
   }
   return {
@@ -60,6 +63,7 @@ function initialForm(i?: Ingreso | null): FormState {
     probabilidad: i.probabilidad,
     es_recurrente: i.es_recurrente,
     frecuencia: i.frecuencia ?? 'mensual',
+    cuenta_destino_id: i.cuenta_destino_id ?? '',
   }
 }
 
@@ -67,9 +71,10 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   ingreso?: Ingreso | null
+  cuentas: Cuenta[]
 }
 
-export default function IngresoForm({ open, onOpenChange, ingreso }: Props) {
+export default function IngresoForm({ open, onOpenChange, ingreso, cuentas }: Props) {
   const [form, setForm] = useState<FormState>(() => initialForm(ingreso))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -99,6 +104,7 @@ export default function IngresoForm({ open, onOpenChange, ingreso }: Props) {
     fd.append('probabilidad', form.probabilidad)
     fd.append('es_recurrente', String(form.es_recurrente))
     if (form.es_recurrente) fd.append('frecuencia', form.frecuencia)
+    if (form.cuenta_destino_id) fd.append('cuenta_destino_id', form.cuenta_destino_id)
 
     startTransition(async () => {
       const result = ingreso
@@ -243,6 +249,29 @@ export default function IngresoForm({ open, onOpenChange, ingreso }: Props) {
                       </option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* Cuenta destino */}
+              {cuentas.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="cuenta_destino_id">Cuenta de destino</Label>
+                  <select
+                    id="cuenta_destino_id"
+                    value={form.cuenta_destino_id}
+                    onChange={set('cuenta_destino_id')}
+                    className={selectClass}
+                  >
+                    <option value="">— Sin cuenta asociada —</option>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Al confirmar el ingreso, se sumará a esta cuenta
+                  </p>
                 </div>
               )}
 

@@ -15,7 +15,7 @@ export default async function CompromisosPage() {
   const startOfMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
 
   const [cuentasRes, compromisosRes, tarjetasRes, pagosRes] = await Promise.all([
-    supabase.from('cuentas').select('saldo_actual, tipo, activa'),
+    supabase.from('cuentas').select('*').eq('activa', true).neq('tipo', 'inversion').order('nombre', { ascending: true }),
     supabase
       .from('compromisos')
       .select('*')
@@ -32,11 +32,10 @@ export default async function CompromisosPage() {
 
   const compromisos: Compromiso[] = compromisosRes.data ?? []
   const tarjetas = tarjetasRes.data ?? []
+  const cuentas = cuentasRes.data ?? []
 
   // Saldo disponible (cuentas líquidas activas)
-  const saldoDisponible = (cuentasRes.data ?? [])
-    .filter((c) => c.activa && c.tipo !== 'inversion')
-    .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
+  const saldoDisponible = cuentas.reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
 
   // Mapa de pagos este mes: compromiso_id → monto total pagado
   const pagosEsteMes: Record<string, number> = {}
@@ -108,6 +107,7 @@ export default async function CompromisosPage() {
               compromiso={c}
               saldoDisponible={saldoDisponible}
               tarjetas={tarjetas}
+              cuentas={cuentas}
               pagadoEsteMes={pagosEsteMes[c.id] ?? null}
             />
           ))}

@@ -15,11 +15,13 @@ import type { BadgeVariant } from '@/components/shared/Badge'
 
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   compromiso: Compromiso
   saldoDisponible: number
   tarjetas: Tarjeta[]
+  cuentas: Cuenta[]
   /** Monto total pagado este mes para este compromiso, null si no se ha pagado */
   pagadoEsteMes: number | null
 }
@@ -54,6 +56,7 @@ export default function CompromisoCard({
   compromiso,
   saldoDisponible,
   tarjetas,
+  cuentas,
   pagadoEsteMes,
 }: Props) {
   const [editOpen, setEditOpen] = useState(false)
@@ -191,6 +194,7 @@ export default function CompromisoCard({
         pagoMinimo={pagoMin}
         esRevolvente={compromiso.tipo_pago === 'revolvente'}
         recomendacion={recomendacion}
+        cuentas={cuentas}
       />
     </>
   )

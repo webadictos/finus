@@ -10,6 +10,9 @@ import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import { marcarPagado } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN } from '@/lib/format'
 import type { Recomendacion } from '@/types/finus'
+import type { Database } from '@/types/database'
+
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   open: boolean
@@ -21,6 +24,7 @@ interface Props {
   pagoMinimo: number | null
   esRevolvente: boolean
   recomendacion: Recomendacion
+  cuentas: Cuenta[]
 }
 
 export default function PagarModal({
@@ -33,8 +37,10 @@ export default function PagarModal({
   pagoMinimo,
   esRevolvente,
   recomendacion,
+  cuentas,
 }: Props) {
   const [monto, setMonto] = useState(String(montoPrincipal))
+  const [cuentaId, setCuentaId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -42,6 +48,7 @@ export default function PagarModal({
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setMonto(String(montoPrincipal))
+      setCuentaId('')
       setError(null)
       setSuccess(false)
     }
@@ -57,7 +64,7 @@ export default function PagarModal({
     setError(null)
 
     startTransition(async () => {
-      const result = await marcarPagado(compromisoId, val)
+      const result = await marcarPagado(compromisoId, val, cuentaId || null)
       if (result.error) {
         setError(result.error)
       } else {
@@ -143,6 +150,26 @@ export default function PagarModal({
                   )}
                 </div>
               </div>
+
+              {/* Cuenta de débito */}
+              {cuentas.length > 0 && (
+                <div className="flex flex-col gap-1.5 mb-3">
+                  <Label htmlFor="cuenta-pago">Pagar desde cuenta</Label>
+                  <select
+                    id="cuenta-pago"
+                    value={cuentaId}
+                    onChange={(e) => setCuentaId(e.target.value)}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30"
+                  >
+                    <option value="">— Sin descontar de cuenta —</option>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} ({formatMXN(Number(c.saldo_actual ?? 0))})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Monto personalizado */}
               <div className="flex flex-col gap-1.5 mb-4">

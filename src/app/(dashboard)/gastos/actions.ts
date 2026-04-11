@@ -35,6 +35,15 @@ export async function registrarGasto(formData: FormData): Promise<ActionResult> 
 
   if (error) return { error: error.message }
 
+  // Actualizar saldo de la cuenta si aplica
+  const cuentaEfectiva = ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null
+  if (cuentaEfectiva) {
+    await supabase.rpc('decrementar_saldo', {
+      p_cuenta_id: cuentaEfectiva,
+      p_monto: parseFloat(formData.get('monto') as string) || 0,
+    })
+  }
+
   revalidatePath('/gastos')
   revalidatePath('/')
   return {}

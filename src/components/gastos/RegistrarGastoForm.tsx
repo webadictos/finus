@@ -98,6 +98,12 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
       if (v !== '') fd.append(k, v)
     })
 
+    // Validar que haya cuenta seleccionada cuando la forma de pago lo requiere
+    if (['efectivo', 'debito'].includes(form.forma_pago) && !form.cuenta_id) {
+      setError('Selecciona una cuenta para descontar el gasto del saldo')
+      return
+    }
+
     startTransition(async () => {
       const result = await registrarGasto(fd)
       if (result.error) {

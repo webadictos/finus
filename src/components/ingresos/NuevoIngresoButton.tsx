@@ -4,8 +4,15 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import IngresoForm from '@/components/ingresos/IngresoForm'
+import type { Database } from '@/types/database'
 
-export default function NuevoIngresoButton() {
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
+
+interface Props {
+  cuentas: Cuenta[]
+}
+
+export default function NuevoIngresoButton({ cuentas }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -14,7 +21,7 @@ export default function NuevoIngresoButton() {
         <Plus />
         Nuevo ingreso
       </Button>
-      <IngresoForm open={open} onOpenChange={setOpen} />
+      <IngresoForm open={open} onOpenChange={setOpen} cuentas={cuentas} />
     </>
   )
 }

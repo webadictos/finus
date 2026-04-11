@@ -462,9 +462,13 @@ export interface Database {
       }
     }
     Functions: {
-      [_ in never]: {
-        Args: Record<string, unknown>
-        Returns: unknown
+      incrementar_saldo: {
+        Args: { p_cuenta_id: string; p_monto: number }
+        Returns: void
+      }
+      decrementar_saldo: {
+        Args: { p_cuenta_id: string; p_monto: number }
+        Returns: void
       }
     }
     Enums: {

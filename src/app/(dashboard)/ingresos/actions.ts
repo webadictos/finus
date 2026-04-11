@@ -36,6 +36,8 @@ export async function crearIngreso(formData: FormData): Promise<ActionResult> {
   const esRecurrente = formData.get('es_recurrente') === 'true'
   const frecuencia = (formData.get('frecuencia') as Frecuencia | null) || null
 
+  const cuentaDestinoId = (formData.get('cuenta_destino_id') as string) || null
+
   const { error } = await supabase.from('ingresos').insert({
     usuario_id: user.id,
     nombre: (formData.get('nombre') as string).trim(),
@@ -46,6 +48,7 @@ export async function crearIngreso(formData: FormData): Promise<ActionResult> {
     estado: 'esperado',
     es_recurrente: esRecurrente,
     frecuencia: esRecurrente ? frecuencia : null,
+    cuenta_destino_id: cuentaDestinoId,
   })
 
   if (error) return { error: error.message }
@@ -68,6 +71,8 @@ export async function actualizarIngreso(
   const esRecurrente = formData.get('es_recurrente') === 'true'
   const frecuencia = (formData.get('frecuencia') as Frecuencia | null) || null
 
+  const cuentaDestinoId = (formData.get('cuenta_destino_id') as string) || null
+
   const { error } = await supabase
     .from('ingresos')
     .update({
@@ -78,6 +83,7 @@ export async function actualizarIngreso(
       probabilidad: (formData.get('probabilidad') as 'alta' | 'media' | 'baja') || 'media',
       es_recurrente: esRecurrente,
       frecuencia: esRecurrente ? frecuencia : null,
+      cuenta_destino_id: cuentaDestinoId,
     })
     .eq('id', id)
     .eq('usuario_id', user.id)
@@ -135,7 +141,15 @@ export async function confirmarIngreso(
 
   if (txErr) return { error: txErr.message }
 
-  // 3. Si es recurrente, generar la siguiente instancia
+  // 3. Actualizar saldo de la cuenta destino
+  if (ingreso.cuenta_destino_id) {
+    await supabase.rpc('incrementar_saldo', {
+      p_cuenta_id: ingreso.cuenta_destino_id,
+      p_monto: montoReal,
+    })
+  }
+
+  // 4. Si es recurrente, generar la siguiente instancia
   if (ingreso.es_recurrente && ingreso.fecha_esperada && ingreso.frecuencia) {
     const nextFecha = siguienteFecha(
       ingreso.fecha_esperada,
