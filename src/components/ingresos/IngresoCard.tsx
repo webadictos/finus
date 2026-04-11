@@ -85,7 +85,7 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
 
   const necesitaAcreditar = confirmado && !ingreso.cuenta_destino_id
 
-  // Cálculo de advertencia de saldo negativo al eliminar
+  // Advertencia de saldo negativo — solo aplica si el ingreso está confirmado con cuenta
   const cuentaDestino = cuentas.find((c) => c.id === ingreso.cuenta_destino_id) ?? null
   const montoParaRevertir = Number(ingreso.monto_real ?? ingreso.monto_esperado ?? 0)
   const saldoPostDelete =
@@ -94,14 +94,21 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
       : null
   const alertaSaldoNegativo = saldoPostDelete !== null && saldoPostDelete < 0
 
+  // Descripción del modal de confirmación — depende de alcance y de si hay reversión de saldo
   const descripcionEliminar = (() => {
-    const base = `¿Eliminar "${ingreso.nombre}" por ${formatMXN(montoParaRevertir > 0 ? montoParaRevertir : monto)}? Esta acción no se puede deshacer.`
+    const montoDisplay = formatMXN(montoParaRevertir > 0 ? montoParaRevertir : monto)
+    const sufijo =
+      pendingAlcance === 'todos_siguientes'
+        ? 'Este y todos los registros futuros de esta serie serán eliminados.'
+        : 'Esta acción no se puede deshacer.'
+
     if (alertaSaldoNegativo && cuentaDestino) {
-      return `Eliminar este ingreso descontará ${formatMXN(montoParaRevertir)} de ${cuentaDestino.nombre}, dejándola con saldo negativo de ${formatMXN(Math.abs(saldoPostDelete!))}. ¿Continuar de todas formas?`
+      return `Eliminar este ingreso descontará ${formatMXN(montoParaRevertir)} de ${cuentaDestino.nombre}, dejándola con saldo negativo de ${formatMXN(Math.abs(saldoPostDelete!))}. ${sufijo} ¿Continuar de todas formas?`
     }
-    return base
+    return `¿Eliminar "${ingreso.nombre}" por ${montoDisplay}? ${sufijo}`
   })()
 
+  // El flujo de eliminación es independiente del estado — solo depende de es_recurrente
   const handleDeleteClick = () => {
     if (ingreso.es_recurrente) {
       setDeleteRecurrenteOpen(true)
@@ -359,8 +366,8 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
                 variant="outline"
                 className="w-full justify-start text-left h-auto py-3 px-4"
                 onClick={() => {
-                  setDeleteRecurrenteOpen(false)
                   setPendingAlcance('este_mes')
+                  setDeleteRecurrenteOpen(false)
                   setConfirmDeleteOpen(true)
                 }}
               >
@@ -373,8 +380,8 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
                 variant="outline"
                 className="w-full justify-start text-left h-auto py-3 px-4 border-destructive/40 text-destructive hover:bg-destructive/10"
                 onClick={() => {
-                  setDeleteRecurrenteOpen(false)
                   setPendingAlcance('todos_siguientes')
+                  setDeleteRecurrenteOpen(false)
                   setConfirmDeleteOpen(true)
                 }}
               >
