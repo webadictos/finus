@@ -3,6 +3,7 @@ import { formatMXN } from '@/lib/format'
 import { Landmark, AlertTriangle } from 'lucide-react'
 import CuentaCard from '@/components/cuentas/CuentaCard'
 import NuevaCuentaButton from '@/components/cuentas/NuevaCuentaButton'
+import NuevaTransferenciaButton from '@/components/cuentas/NuevaTransferenciaButton'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -43,7 +44,12 @@ export default async function CuentasPage() {
             Tus cuentas bancarias, efectivo e inversiones
           </p>
         </div>
-        <NuevaCuentaButton />
+        <div className="flex items-center gap-2">
+          {cuentas.length >= 2 && (
+            <NuevaTransferenciaButton cuentas={cuentas} label="Transferir" />
+          )}
+          <NuevaCuentaButton />
+        </div>
       </div>
 
       {/* Resumen de saldo */}

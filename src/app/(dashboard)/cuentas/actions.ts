@@ -5,6 +5,74 @@ import { revalidatePath } from 'next/cache'
 
 export type ActionResult = { error?: string }
 
+export async function transferirEntreCuentas(
+  cuentaOrigenId: string,
+  cuentaDestinoId: string,
+  monto: number,
+  fecha: string,
+  notas?: string
+): Promise<ActionResult> {
+  if (cuentaOrigenId === cuentaDestinoId)
+    return { error: 'La cuenta origen y destino no pueden ser la misma' }
+  if (monto <= 0) return { error: 'El monto debe ser mayor a cero' }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // Verificar que ambas cuentas pertenecen al usuario
+  const { data: cuentas } = await supabase
+    .from('cuentas')
+    .select('id, nombre')
+    .eq('activa', true)
+    .eq('usuario_id', user.id)
+    .in('id', [cuentaOrigenId, cuentaDestinoId])
+
+  if (!cuentas || cuentas.length !== 2)
+    return { error: 'Una o ambas cuentas no existen o no te pertenecen' }
+
+  const nombreOrigen = cuentas.find((c) => c.id === cuentaOrigenId)?.nombre ?? cuentaOrigenId
+  const nombreDestino = cuentas.find((c) => c.id === cuentaDestinoId)?.nombre ?? cuentaDestinoId
+
+  // Decrementar origen → incrementar destino (en ese orden para evitar saldo negativo intermedio)
+  const { error: errDec } = await supabase.rpc('decrementar_saldo', {
+    p_cuenta_id: cuentaOrigenId,
+    p_monto: monto,
+  })
+  if (errDec) return { error: errDec.message }
+
+  const { error: errInc } = await supabase.rpc('incrementar_saldo', {
+    p_cuenta_id: cuentaDestinoId,
+    p_monto: monto,
+  })
+  if (errInc) return { error: errInc.message }
+
+  const notaFinal = [
+    `Transferencia a: ${nombreDestino}`,
+    notas?.trim() ? notas.trim() : null,
+  ]
+    .filter(Boolean)
+    .join(' — ')
+
+  const { error: errTx } = await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    tipo: 'transferencia',
+    monto,
+    fecha,
+    descripcion: `Transferencia de ${nombreOrigen} a ${nombreDestino}`,
+    cuenta_id: cuentaOrigenId,
+    notas: notaFinal,
+    es_recurrente: false,
+  })
+  if (errTx) return { error: errTx.message }
+
+  revalidatePath('/cuentas')
+  revalidatePath('/')
+  return {}
+}
+
 export async function crearCuenta(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const {

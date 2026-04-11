@@ -5,6 +5,7 @@ import KPICards from '@/components/dashboard/KPICards'
 import AlertasVencimiento from '@/components/dashboard/AlertasVencimiento'
 import ProximosIngresos from '@/components/dashboard/ProximosIngresos'
 import AconsejameButton from '@/components/dashboard/AconsejameButton'
+import NuevaTransferenciaButton from '@/components/cuentas/NuevaTransferenciaButton'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -59,7 +60,18 @@ async function DashboardData() {
     <>
       <SaldoHeader cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
       <KPICards cuentas={cuentas} ingresos={ingresos} compromisos={compromisos} />
-      <AconsejameButton />
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <AconsejameButton />
+        </div>
+        {cuentas.length >= 2 && (
+          <NuevaTransferenciaButton
+            cuentas={cuentas}
+            label="Transferir"
+            variant="outline"
+          />
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AlertasVencimiento compromisos={compromisos} saldoDisponible={saldoDisponible} />
         <ProximosIngresos ingresos={ingresos} />
