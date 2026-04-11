@@ -182,6 +182,54 @@ export async function marcarPagado(
   }
 }
 
+export async function eliminarCompromiso(
+  id: string,
+  alcance: 'este_mes' | 'completo'
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  if (alcance === 'completo') {
+    const { error } = await supabase
+      .from('compromisos')
+      .update({ activo: false })
+      .eq('id', id)
+      .eq('usuario_id', user.id)
+    if (error) return { error: error.message }
+  } else {
+    // 'este_mes': avanzar fecha_proximo_pago un mes (saltar el cobro actual)
+    const { data: compromiso, error: fetchErr } = await supabase
+      .from('compromisos')
+      .select('fecha_proximo_pago')
+      .eq('id', id)
+      .eq('usuario_id', user.id)
+      .single()
+
+    if (fetchErr || !compromiso) return { error: 'Compromiso no encontrado' }
+
+    let siguienteFecha: string | null = null
+    if (compromiso.fecha_proximo_pago) {
+      const d = new Date(compromiso.fecha_proximo_pago + 'T12:00:00')
+      d.setMonth(d.getMonth() + 1)
+      siguienteFecha = d.toISOString().split('T')[0]
+    }
+
+    const { error } = await supabase
+      .from('compromisos')
+      .update({ fecha_proximo_pago: siguienteFecha })
+      .eq('id', id)
+      .eq('usuario_id', user.id)
+    if (error) return { error: error.message }
+  }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
 export async function deshacerMarcarPagado(
   transaccionId: string,
   compromisoId: string,

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { confirmarIngreso } from '@/app/(dashboard)/ingresos/actions'
+import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
 
@@ -51,6 +52,7 @@ export default function ConfirmarModal({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const hasCuenta = !!cuentaDestinoId
   const cuentaNombre = hasCuenta
@@ -71,6 +73,7 @@ export default function ConfirmarModal({
     onOpenChange(next)
   }
 
+  // Paso 1: validar y abrir modal de confirmación
   const confirmar = () => {
     const val = parseFloat(monto)
     if (isNaN(val) || val <= 0) {
@@ -86,8 +89,12 @@ export default function ConfirmarModal({
       return
     }
     setError(null)
+    setConfirmOpen(true)
+  }
 
-    // La cuenta efectiva: si el ingreso ya tenía una, usarla; si no, usar la seleccionada ahora
+  // Paso 2: ejecutar la acción tras confirmación
+  const ejecutarConfirmar = () => {
+    const val = parseFloat(monto)
     const efectivaCuentaId = hasCuenta ? cuentaDestinoId! : selectedCuentaId
 
     startTransition(async () => {
@@ -97,6 +104,7 @@ export default function ConfirmarModal({
         fecha,
         hasCuenta ? undefined : efectivaCuentaId
       )
+      setConfirmOpen(false)
       if (result.error) {
         setError(result.error)
       } else {
@@ -224,13 +232,30 @@ export default function ConfirmarModal({
                 </p>
               )}
 
-              <Button className="w-full" onClick={confirmar} disabled={isPending}>
-                {isPending ? 'Confirmando...' : 'Confirmar recibido'}
+              <Button className="w-full" onClick={confirmar}>
+                Confirmar recibido
               </Button>
             </>
           )}
         </Dialog.Content>
       </Dialog.Portal>
+
+      {/* Modal de confirmación */}
+      <ConfirmarAccionModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        titulo="¿Confirmar ingreso?"
+        descripcion={(() => {
+          const val = parseFloat(monto)
+          const efectivaCuentaId = hasCuenta ? cuentaDestinoId! : selectedCuentaId
+          const nombreCuenta =
+            cuentas.find((c) => c.id === efectivaCuentaId)?.nombre ?? 'la cuenta seleccionada'
+          return `¿Confirmar "${nombre}" por ${formatMXN(isNaN(val) ? 0 : val)}? Esto sumará ${formatMXN(isNaN(val) ? 0 : val)} al saldo de ${nombreCuenta}.`
+        })()}
+        labelConfirmar="Confirmar"
+        onConfirm={ejecutarConfirmar}
+        loading={isPending}
+      />
     </Dialog.Root>
   )
 }

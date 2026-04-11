@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
+import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { marcarPagado } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN } from '@/lib/format'
 import type { Recomendacion } from '@/types/finus'
@@ -51,6 +52,7 @@ export default function PagarModal({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
@@ -62,6 +64,7 @@ export default function PagarModal({
     onOpenChange(next)
   }
 
+  // Paso 1: validar y abrir modal de confirmación
   const confirmar = () => {
     const val = parseFloat(monto)
     if (isNaN(val) || val <= 0) {
@@ -69,9 +72,15 @@ export default function PagarModal({
       return
     }
     setError(null)
+    setConfirmOpen(true)
+  }
 
+  // Paso 2: ejecutar la acción tras confirmación
+  const ejecutarPago = () => {
+    const val = parseFloat(monto)
     startTransition(async () => {
       const result = await marcarPagado(compromisoId, val, cuentaId || null)
+      setConfirmOpen(false)
       if (result.error) {
         setError(result.error)
       } else {
@@ -214,17 +223,30 @@ export default function PagarModal({
                 </p>
               )}
 
-              <Button
-                className="w-full"
-                onClick={confirmar}
-                disabled={isPending}
-              >
-                {isPending ? 'Registrando...' : 'Confirmar pago'}
+              <Button className="w-full" onClick={confirmar}>
+                Confirmar pago
               </Button>
             </>
           )}
         </Dialog.Content>
       </Dialog.Portal>
+
+      {/* Modal de confirmación */}
+      <ConfirmarAccionModal
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        titulo="¿Registrar pago?"
+        descripcion={(() => {
+          const val = parseFloat(monto)
+          const montoStr = formatMXN(isNaN(val) ? 0 : val)
+          return cuentaSeleccionada
+            ? `¿Marcar "${nombre}" como pagado por ${montoStr}? Esto se descontará del saldo de ${cuentaSeleccionada.nombre}.`
+            : `¿Marcar "${nombre}" como pagado por ${montoStr}? No se descontará de ninguna cuenta — solo queda registrado.`
+        })()}
+        labelConfirmar="Registrar pago"
+        onConfirm={ejecutarPago}
+        loading={isPending}
+      />
     </Dialog.Root>
   )
 }

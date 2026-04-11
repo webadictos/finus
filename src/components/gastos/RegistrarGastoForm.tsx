@@ -6,11 +6,12 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { registrarGasto } from '@/app/(dashboard)/gastos/actions'
+import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
+type Transaccion = Database['public']['Tables']['transacciones']['Row']
 
 const CATEGORIA_OPTIONS = [
   { value: 'comida', label: 'Comida' },
@@ -50,17 +51,30 @@ function todayISO() {
   return new Date().toISOString().split('T')[0]
 }
 
-function initialForm(): FormState {
+function initialForm(tx?: Transaccion | null): FormState {
+  if (!tx) {
+    return {
+      monto: '',
+      descripcion: '',
+      categoria: 'otro',
+      forma_pago: 'efectivo',
+      cuenta_id: '',
+      tarjeta_id: '',
+      meses_msi: '',
+      fecha: todayISO(),
+      notas: '',
+    }
+  }
   return {
-    monto: '',
-    descripcion: '',
-    categoria: 'otro',
-    forma_pago: 'efectivo',
-    cuenta_id: '',
-    tarjeta_id: '',
-    meses_msi: '',
-    fecha: todayISO(),
-    notas: '',
+    monto: String(Number(tx.monto ?? 0)),
+    descripcion: tx.descripcion ?? '',
+    categoria: tx.categoria ?? 'otro',
+    forma_pago: tx.forma_pago ?? 'efectivo',
+    cuenta_id: tx.cuenta_id ?? '',
+    tarjeta_id: tx.tarjeta_id ?? '',
+    meses_msi: tx.meses_msi != null ? String(tx.meses_msi) : '',
+    fecha: tx.fecha.slice(0, 10),
+    notas: tx.notas ?? '',
   }
 }
 
@@ -69,16 +83,19 @@ interface Props {
   onOpenChange: (open: boolean) => void
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  /** Si se pasa, el form entra en modo edición */
+  transaccion?: Transaccion | null
 }
 
-export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas }: Props) {
-  const [form, setForm] = useState<FormState>(initialForm)
+export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, transaccion }: Props) {
+  const isEditing = !!transaccion
+  const [form, setForm] = useState<FormState>(() => initialForm(transaccion))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      setForm(initialForm())
+      setForm(initialForm(transaccion))
       setError(null)
     }
     onOpenChange(next)
@@ -105,7 +122,9 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
     }
 
     startTransition(async () => {
-      const result = await registrarGasto(fd)
+      const result = isEditing
+        ? await actualizarGasto(transaccion!.id, fd)
+        : await registrarGasto(fd)
       if (result.error) {
         setError(result.error)
       } else {
@@ -130,7 +149,9 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between border-b px-5 py-4">
-            <Dialog.Title className="text-base font-semibold">Registrar gasto</Dialog.Title>
+            <Dialog.Title className="text-base font-semibold">
+              {isEditing ? 'Editar gasto' : 'Registrar gasto'}
+            </Dialog.Title>
             <Dialog.Close asChild>
               <Button variant="ghost" size="icon">
                 <X className="size-4" />
@@ -281,7 +302,9 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
 
             <div className="mt-auto border-t px-5 py-4">
               <Button type="submit" className="w-full" disabled={isPending}>
-                {isPending ? 'Registrando...' : 'Registrar gasto'}
+                {isPending
+                  ? isEditing ? 'Guardando...' : 'Registrando...'
+                  : isEditing ? 'Guardar cambios' : 'Registrar gasto'}
               </Button>
             </div>
           </form>

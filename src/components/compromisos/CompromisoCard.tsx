@@ -1,15 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { Pencil, CheckCircle2 } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Pencil, CheckCircle2, Trash2 } from 'lucide-react'
+import { Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
+import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import Badge from '@/components/shared/Badge'
 import ProgressBar from '@/components/shared/ProgressBar'
 import UndoBar from '@/components/shared/UndoBar'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import CompromisoForm from '@/components/compromisos/CompromisoForm'
 import PagarModal from '@/components/compromisos/PagarModal'
-import { deshacerMarcarPagado } from '@/app/(dashboard)/compromisos/actions'
+import { deshacerMarcarPagado, eliminarCompromiso } from '@/app/(dashboard)/compromisos/actions'
 import { getRecomendacion } from '@/lib/recommendations'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
@@ -72,6 +74,23 @@ export default function CompromisoCard({
   const [editOpen, setEditOpen] = useState(false)
   const [pagarOpen, setPagarOpen] = useState(false)
   const [undoData, setUndoData] = useState<UndoData | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteSimpleOpen, setDeleteSimpleOpen] = useState(false)
+  const [deleteLoading, startDeleteTransition] = useTransition()
+
+  // Un compromiso es recurrente si es revolvente/fijo (indefinido) o tiene >1 mensualidad restante
+  const esRecurrente =
+    compromiso.tipo_pago === 'revolvente' ||
+    compromiso.tipo_pago === 'fijo' ||
+    (compromiso.mensualidades_restantes != null && compromiso.mensualidades_restantes > 1)
+
+  const handleEliminar = (alcance: 'este_mes' | 'completo') => {
+    startDeleteTransition(async () => {
+      await eliminarCompromiso(compromiso.id, alcance)
+      setDeleteOpen(false)
+      setDeleteSimpleOpen(false)
+    })
+  }
 
   const monto = Number(compromiso.monto_mensualidad ?? 0)
   const pagoMin = compromiso.pago_minimo != null ? Number(compromiso.pago_minimo) : null
@@ -144,6 +163,13 @@ export default function CompromisoCard({
             <Button variant="ghost" size="icon-sm" onClick={() => setEditOpen(true)}>
               <Pencil className="size-3.5" />
             </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => esRecurrente ? setDeleteOpen(true) : setDeleteSimpleOpen(true)}
+            >
+              <Trash2 className="size-3.5 text-destructive" />
+            </Button>
           </div>
         </div>
 
@@ -205,6 +231,76 @@ export default function CompromisoCard({
       </div>
 
       {/* Modales */}
+      {/* Modal eliminar — compromiso recurrente (dos opciones) */}
+      <Dialog.Root open={deleteOpen} onOpenChange={deleteLoading ? undefined : setDeleteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 duration-200"
+            aria-describedby="delete-recurrente-desc"
+          >
+            <Dialog.Title className="text-base font-semibold mb-1">
+              Eliminar compromiso
+            </Dialog.Title>
+            <Dialog.Description
+              id="delete-recurrente-desc"
+              className="text-sm text-muted-foreground mb-5"
+            >
+              <span className="font-medium text-foreground">{compromiso.nombre}</span> es un compromiso recurrente.
+              ¿Cómo deseas eliminarlo?
+            </Dialog.Description>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={() => handleEliminar('este_mes')}
+                disabled={deleteLoading}
+              >
+                <div className="text-left">
+                  <p className="text-sm font-medium">Saltar este mes</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Avanza la fecha al mes siguiente. El compromiso sigue activo.
+                  </p>
+                </div>
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={() => handleEliminar('completo')}
+                disabled={deleteLoading}
+              >
+                <div className="text-left">
+                  <p className="text-sm font-medium">
+                    {deleteLoading ? 'Eliminando...' : 'Eliminar completamente'}
+                  </p>
+                  <p className="text-xs opacity-80 mt-0.5">
+                    Desactiva el compromiso. No se puede deshacer.
+                  </p>
+                </div>
+              </Button>
+              <Dialog.Close asChild>
+                <Button variant="ghost" className="w-full" disabled={deleteLoading}>
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Modal eliminar — compromiso no recurrente (confirmación simple) */}
+      <ConfirmarAccionModal
+        open={deleteSimpleOpen}
+        onOpenChange={setDeleteSimpleOpen}
+        titulo="Eliminar compromiso"
+        descripcion={`¿Eliminar "${compromiso.nombre}"? Esta acción no se puede deshacer.`}
+        labelConfirmar="Eliminar"
+        variante="destructive"
+        onConfirm={() => handleEliminar('completo')}
+        loading={deleteLoading}
+      />
+
       <CompromisoForm
         open={editOpen}
         onOpenChange={setEditOpen}

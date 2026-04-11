@@ -159,6 +159,8 @@ export default function GastosClient({ transacciones, cuentas, tarjetas }: Props
                     key={t.id}
                     transaccion={t}
                     tarjetaNombre={t.tarjeta_id ? tarjetasMap.get(t.tarjeta_id) : null}
+                    cuentas={cuentas}
+                    tarjetas={tarjetas}
                   />
                 ))}
               </div>
