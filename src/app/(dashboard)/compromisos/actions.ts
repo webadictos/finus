@@ -26,8 +26,8 @@ export async function crearCompromiso(formData: FormData): Promise<ActionResult>
     fecha_proximo_pago: (formData.get('fecha_proximo_pago') as string) || null,
     prioridad: ((formData.get('prioridad') as string) || null) as 'alta' | 'media' | 'baja' | null,
     tarjeta_id: tarjetaId,
-    msi_mensualidades: formData.get('msi_mensualidades')
-      ? parseInt(formData.get('msi_mensualidades') as string)
+    mensualidades_restantes: formData.get('mensualidades_restantes')
+      ? parseInt(formData.get('mensualidades_restantes') as string)
       : null,
     saldo_real: formData.get('saldo_real')
       ? parseFloat(formData.get('saldo_real') as string)
@@ -38,7 +38,7 @@ export async function crearCompromiso(formData: FormData): Promise<ActionResult>
     pago_minimo: formData.get('pago_minimo')
       ? parseFloat(formData.get('pago_minimo') as string)
       : null,
-    tasa_interes_mensual: !isNaN(tasaAnual) && tasaAnual > 0 ? tasaAnual / 12 : null,
+    tasa_interes_anual: !isNaN(tasaAnual) && tasaAnual > 0 ? tasaAnual : null,
     activo: true,
   })
 
@@ -73,8 +73,8 @@ export async function actualizarCompromiso(
       fecha_proximo_pago: (formData.get('fecha_proximo_pago') as string) || null,
       prioridad: ((formData.get('prioridad') as string) || null) as 'alta' | 'media' | 'baja' | null,
       tarjeta_id: tarjetaId,
-      msi_mensualidades: formData.get('msi_mensualidades')
-        ? parseInt(formData.get('msi_mensualidades') as string)
+      mensualidades_restantes: formData.get('mensualidades_restantes')
+        ? parseInt(formData.get('mensualidades_restantes') as string)
         : null,
       saldo_real: formData.get('saldo_real')
         ? parseFloat(formData.get('saldo_real') as string)
@@ -85,7 +85,7 @@ export async function actualizarCompromiso(
       pago_minimo: formData.get('pago_minimo')
         ? parseFloat(formData.get('pago_minimo') as string)
         : null,
-      tasa_interes_mensual: !isNaN(tasaAnual) && tasaAnual > 0 ? tasaAnual / 12 : null,
+      tasa_interes_anual: !isNaN(tasaAnual) && tasaAnual > 0 ? tasaAnual : null,
     })
     .eq('id', id)
     .eq('usuario_id', user.id)

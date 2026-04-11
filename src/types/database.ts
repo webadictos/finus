@@ -200,16 +200,21 @@ export interface Database {
           usuario_id: string
           tarjeta_id: string | null
           nombre: string
+          categoria: string | null
           tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
-          saldo_real: number | null
           monto_mensualidad: number | null
-          pago_minimo: number | null
-          pago_sin_intereses: number | null
-          msi_mensualidades: number | null
-          msi_mensualidad: number | null
-          tasa_interes_mensual: number | null
           fecha_proximo_pago: string | null
-          dia_pago: number | null
+          mensualidades_restantes: number | null
+          fecha_inicio: string | null
+          monto_original: number | null
+          meses_totales: number | null
+          saldo_estimado: number | null
+          fecha_fin_estimada: string | null
+          saldo_real: number | null
+          pago_sin_intereses: number | null
+          pago_minimo: number | null
+          fecha_corte: number | null
+          tasa_interes_anual: number | null
           prioridad: 'alta' | 'media' | 'baja' | null
           activo: boolean
           created_at: string
@@ -220,16 +225,21 @@ export interface Database {
           usuario_id: string
           tarjeta_id?: string | null
           nombre: string
+          categoria?: string | null
           tipo_pago: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
-          saldo_real?: number | null
           monto_mensualidad?: number | null
-          pago_minimo?: number | null
-          pago_sin_intereses?: number | null
-          msi_mensualidades?: number | null
-          msi_mensualidad?: number | null
-          tasa_interes_mensual?: number | null
           fecha_proximo_pago?: string | null
-          dia_pago?: number | null
+          mensualidades_restantes?: number | null
+          fecha_inicio?: string | null
+          monto_original?: number | null
+          meses_totales?: number | null
+          saldo_estimado?: number | null
+          fecha_fin_estimada?: string | null
+          saldo_real?: number | null
+          pago_sin_intereses?: number | null
+          pago_minimo?: number | null
+          fecha_corte?: number | null
+          tasa_interes_anual?: number | null
           prioridad?: 'alta' | 'media' | 'baja' | null
           activo?: boolean
           created_at?: string
@@ -240,16 +250,21 @@ export interface Database {
           usuario_id?: string
           tarjeta_id?: string | null
           nombre?: string
+          categoria?: string | null
           tipo_pago?: 'fijo' | 'revolvente' | 'msi' | 'prestamo' | 'disposicion_efectivo'
-          saldo_real?: number | null
           monto_mensualidad?: number | null
-          pago_minimo?: number | null
-          pago_sin_intereses?: number | null
-          msi_mensualidades?: number | null
-          msi_mensualidad?: number | null
-          tasa_interes_mensual?: number | null
           fecha_proximo_pago?: string | null
-          dia_pago?: number | null
+          mensualidades_restantes?: number | null
+          fecha_inicio?: string | null
+          monto_original?: number | null
+          meses_totales?: number | null
+          saldo_estimado?: number | null
+          fecha_fin_estimada?: string | null
+          saldo_real?: number | null
+          pago_sin_intereses?: number | null
+          pago_minimo?: number | null
+          fecha_corte?: number | null
+          tasa_interes_anual?: number | null
           prioridad?: 'alta' | 'media' | 'baja' | null
           activo?: boolean
           updated_at?: string

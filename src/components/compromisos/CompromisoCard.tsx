@@ -74,13 +74,9 @@ export default function CompromisoCard({
       monto_mensualidad: monto,
       pago_minimo: pagoMin,
       pago_sin_intereses: pagoSinInt,
-      msi_mensualidades: compromiso.msi_mensualidades,
-      msi_mensualidad:
-        compromiso.msi_mensualidad != null ? Number(compromiso.msi_mensualidad) : null,
-      tasa_interes_mensual:
-        compromiso.tasa_interes_mensual != null
-          ? Number(compromiso.tasa_interes_mensual)
-          : null,
+      mensualidades_restantes: compromiso.mensualidades_restantes,
+      tasa_interes_anual:
+        compromiso.tasa_interes_anual != null ? Number(compromiso.tasa_interes_anual) : null,
       fecha_proximo_pago: compromiso.fecha_proximo_pago,
       nombre: compromiso.nombre,
     },

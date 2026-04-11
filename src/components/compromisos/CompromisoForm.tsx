@@ -32,7 +32,7 @@ interface FormState {
   tipo_pago: TipoPago
   monto_mensualidad: string
   fecha_proximo_pago: string
-  msi_mensualidades: string
+  mensualidades_restantes: string
   prioridad: string
   tarjeta_id: string
   saldo_real: string
@@ -48,7 +48,7 @@ function initialForm(c?: Compromiso | null): FormState {
       tipo_pago: 'fijo',
       monto_mensualidad: '',
       fecha_proximo_pago: '',
-      msi_mensualidades: '',
+      mensualidades_restantes: '',
       prioridad: '',
       tarjeta_id: '',
       saldo_real: '',
@@ -62,16 +62,14 @@ function initialForm(c?: Compromiso | null): FormState {
     tipo_pago: c.tipo_pago,
     monto_mensualidad: c.monto_mensualidad != null ? String(Number(c.monto_mensualidad)) : '',
     fecha_proximo_pago: c.fecha_proximo_pago ?? '',
-    msi_mensualidades: c.msi_mensualidades != null ? String(c.msi_mensualidades) : '',
+    mensualidades_restantes: c.mensualidades_restantes != null ? String(c.mensualidades_restantes) : '',
     prioridad: c.prioridad ?? '',
     tarjeta_id: c.tarjeta_id ?? '',
     saldo_real: c.saldo_real != null ? String(Number(c.saldo_real)) : '',
     pago_sin_intereses: c.pago_sin_intereses != null ? String(Number(c.pago_sin_intereses)) : '',
     pago_minimo: c.pago_minimo != null ? String(Number(c.pago_minimo)) : '',
     tasa_interes_anual:
-      c.tasa_interes_mensual != null
-        ? String(Math.round(Number(c.tasa_interes_mensual) * 12 * 100) / 100)
-        : '',
+      c.tasa_interes_anual != null ? String(Number(c.tasa_interes_anual)) : '',
   }
 }
 
@@ -212,15 +210,15 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
               {/* MSI: mensualidades restantes */}
               {isMSI && (
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="msi_mensualidades">Mensualidades restantes</Label>
+                  <Label htmlFor="mensualidades_restantes">Mensualidades restantes</Label>
                   <Input
-                    id="msi_mensualidades"
+                    id="mensualidades_restantes"
                     type="number"
                     min="1"
                     step="1"
                     placeholder="ej. 12"
-                    value={form.msi_mensualidades}
-                    onChange={set('msi_mensualidades')}
+                    value={form.mensualidades_restantes}
+                    onChange={set('mensualidades_restantes')}
                   />
                 </div>
               )}

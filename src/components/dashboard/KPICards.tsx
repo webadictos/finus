@@ -17,7 +17,7 @@ function calcularPagoMinimo(c: Compromiso): number {
     case 'revolvente':
       return Number(c.pago_minimo ?? 0)
     case 'msi':
-      return Number(c.msi_mensualidad ?? 0)
+      return Number(c.monto_mensualidad ?? 0)
     case 'prestamo':
     case 'fijo':
     case 'disposicion_efectivo':

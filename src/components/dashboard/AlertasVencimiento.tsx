@@ -62,9 +62,8 @@ export default function AlertasVencimiento({ compromisos, saldoDisponible }: Pro
             monto_mensualidad: compromiso.monto_mensualidad != null ? Number(compromiso.monto_mensualidad) : null,
             pago_minimo: compromiso.pago_minimo != null ? Number(compromiso.pago_minimo) : null,
             pago_sin_intereses: compromiso.pago_sin_intereses != null ? Number(compromiso.pago_sin_intereses) : null,
-            msi_mensualidades: compromiso.msi_mensualidades != null ? Number(compromiso.msi_mensualidades) : null,
-            msi_mensualidad: compromiso.msi_mensualidad != null ? Number(compromiso.msi_mensualidad) : null,
-            tasa_interes_mensual: compromiso.tasa_interes_mensual != null ? Number(compromiso.tasa_interes_mensual) : null,
+            mensualidades_restantes: compromiso.mensualidades_restantes,
+            tasa_interes_anual: compromiso.tasa_interes_anual != null ? Number(compromiso.tasa_interes_anual) : null,
             fecha_proximo_pago: compromiso.fecha_proximo_pago,
             nombre: compromiso.nombre,
           }

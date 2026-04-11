@@ -100,12 +100,12 @@ function recomendarMSI(
   compromiso: CompromisoParaRecomendacion,
   saldo: number
 ): Recomendacion {
-  const mensualidad = Number(compromiso.msi_mensualidad ?? compromiso.monto_mensualidad ?? 0)
+  const mensualidad = Number(compromiso.monto_mensualidad ?? 0)
 
   if (saldo >= mensualidad) {
     return {
       accion: `Paga la mensualidad MSI — obligatorio`,
-      detalle: `${compromiso.msi_mensualidades} meses sin intereses. No pagar genera intereses retroactivos.`,
+      detalle: `${compromiso.mensualidades_restantes ?? '?'} meses sin intereses. No pagar genera intereses retroactivos.`,
       color: 'verde',
       monto_sugerido: mensualidad,
       monto_minimo: mensualidad,
@@ -167,7 +167,7 @@ function recomendarRevolvente(
   const pagoSinIntereses = Number(compromiso.pago_sin_intereses ?? 0)
   const minimo = Number(compromiso.monto_mensualidad ?? compromiso.pago_minimo ?? 0)
   const colchon = Math.ceil(minimo * FACTOR_COLCHON)
-  const tasaMensual = compromiso.tasa_interes_mensual
+  const tasaMensual = compromiso.tasa_interes_anual != null ? Number(compromiso.tasa_interes_anual) / 12 : null
 
   // Caso 1: Liquidación total posible
   if (montoTotal > 0 && saldo >= montoTotal) {
@@ -280,10 +280,8 @@ function recomendarDisposicion(
   // La disposición de efectivo tiene intereses desde el día 1, tratar como préstamo
   const cuota = Number(compromiso.monto_mensualidad ?? compromiso.pago_minimo ?? 0)
   const saldoReal = Number(compromiso.saldo_real ?? 0)
-  const interesEstimado = calcularInteresEstimado(
-    saldoReal,
-    compromiso.tasa_interes_mensual
-  )
+  const tasaMensualDisp = compromiso.tasa_interes_anual != null ? Number(compromiso.tasa_interes_anual) / 12 : null
+  const interesEstimado = calcularInteresEstimado(saldoReal, tasaMensualDisp)
 
   if (saldo >= saldoReal && saldoReal > 0) {
     return {
