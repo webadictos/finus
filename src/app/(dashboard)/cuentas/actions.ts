@@ -12,15 +12,20 @@ export async function crearCuenta(formData: FormData): Promise<ActionResult> {
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  const tieneTarjeta = formData.get('tiene_tarjeta_debito') === 'true'
+  const ultimos4 = (formData.get('ultimos_4_debito') as string)?.trim() || null
+
   const { error } = await supabase.from('cuentas').insert({
     usuario_id: user.id,
     nombre: (formData.get('nombre') as string).trim(),
     tipo: formData.get('tipo') as 'banco' | 'efectivo' | 'digital' | 'inversion',
-    moneda: (formData.get('moneda') as string) || 'MXN',
+    tiene_tarjeta_debito: tieneTarjeta,
+    ultimos_4_debito: tieneTarjeta ? ultimos4 : null,
     color: (formData.get('color') as string)?.trim() || null,
     icono: (formData.get('icono') as string)?.trim() || null,
     activa: true,
     // saldo_actual omitido — tiene DEFAULT 0 en BD
+    // moneda omitida — DEFAULT 'MXN' en BD
   })
 
   if (error) return { error: error.message }
@@ -40,13 +45,17 @@ export async function actualizarCuenta(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
+  const tieneTarjeta = formData.get('tiene_tarjeta_debito') === 'true'
+  const ultimos4 = (formData.get('ultimos_4_debito') as string)?.trim() || null
+
   // NUNCA modificar saldo_actual con .update() — solo via RPC incrementar/decrementar_saldo
   const { error } = await supabase
     .from('cuentas')
     .update({
       nombre: (formData.get('nombre') as string).trim(),
       tipo: formData.get('tipo') as 'banco' | 'efectivo' | 'digital' | 'inversion',
-      moneda: (formData.get('moneda') as string) || 'MXN',
+      tiene_tarjeta_debito: tieneTarjeta,
+      ultimos_4_debito: tieneTarjeta ? ultimos4 : null,
       color: (formData.get('color') as string)?.trim() || null,
       icono: (formData.get('icono') as string)?.trim() || null,
     })

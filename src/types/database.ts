@@ -54,6 +54,8 @@ export interface Database {
           nombre: string
           tipo: 'banco' | 'efectivo' | 'digital' | 'inversion'
           saldo_actual: number
+          tiene_tarjeta_debito: boolean
+          ultimos_4_debito: string | null
           color: string | null
           icono: string | null
           moneda: string
@@ -67,6 +69,8 @@ export interface Database {
           nombre: string
           tipo: 'banco' | 'efectivo' | 'digital' | 'inversion'
           saldo_actual?: number
+          tiene_tarjeta_debito?: boolean
+          ultimos_4_debito?: string | null
           color?: string | null
           icono?: string | null
           moneda?: string
@@ -80,6 +84,8 @@ export interface Database {
           nombre?: string
           tipo?: 'banco' | 'efectivo' | 'digital' | 'inversion'
           saldo_actual?: number
+          tiene_tarjeta_debito?: boolean
+          ultimos_4_debito?: string | null
           color?: string | null
           icono?: string | null
           moneda?: string

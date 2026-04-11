@@ -44,11 +44,13 @@
 | usuario_id | uuid FK | → usuarios |
 | nombre | text | ej: "BBVA débito Daniel", "Efectivo" |
 | tipo | enum | `banco \| efectivo \| digital \| inversion` |
-| saldo_actual | numeric | ⚠️ Solo modificar via RPC |
-| color | text\|null | |
-| icono | text\|null | |
-| moneda | text | default 'MXN' |
-| **activa** | boolean | ⚠️ femenino → `.eq('activa', true)` |
+| saldo_actual | numeric(12,2) | ⚠️ Solo modificar via RPC; default 0 |
+| tiene_tarjeta_debito | boolean | default false |
+| ultimos_4_debito | char(4)\|null | últimos 4 dígitos de la tarjeta débito |
+| color | text\|null | default '#6366F1' |
+| icono | text\|null | default '🏦' |
+| moneda | text | default 'MXN' — no se edita en UI |
+| **activa** | boolean | ⚠️ femenino → `.eq('activa', true)`; default true |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 
