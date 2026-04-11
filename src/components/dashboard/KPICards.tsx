@@ -60,10 +60,15 @@ export default function KPICards({ cuentas, ingresos, compromisos }: Props) {
   const en30dias = new Date(hoy)
   en30dias.setDate(en30dias.getDate() + 30)
 
-  // 1. Disponible ahora (cuentas líquidas activas)
-  const disponible = cuentas
-    .filter((c) => c.activa && c.tipo !== 'inversion')
-    .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
+  // 1. Disponible ahora (cuentas líquidas + ingresos confirmados sin cuenta)
+  const ingresosSinCuenta = ingresos
+    .filter((i) => i.estado === 'confirmado' && !i.cuenta_destino_id)
+    .reduce((sum, i) => sum + Number(i.monto_real ?? i.monto_esperado ?? 0), 0)
+
+  const disponible =
+    cuentas
+      .filter((c) => c.activa && c.tipo !== 'inversion')
+      .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0) + ingresosSinCuenta
 
   // 2. Por recibir (ingresos pendientes próximos 30 días)
   const porRecibir = ingresos

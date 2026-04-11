@@ -25,6 +25,12 @@ interface Props {
   esRevolvente: boolean
   recomendacion: Recomendacion
   cuentas: Cuenta[]
+  onSuccess?: (data: {
+    transaccionId: string
+    fechaAnterior: string | null
+    cuentaId: string | null
+    monto: number
+  }) => void
 }
 
 export default function PagarModal({
@@ -38,6 +44,7 @@ export default function PagarModal({
   esRevolvente,
   recomendacion,
   cuentas,
+  onSuccess,
 }: Props) {
   const [monto, setMonto] = useState(String(montoPrincipal))
   const [cuentaId, setCuentaId] = useState('')
@@ -69,10 +76,20 @@ export default function PagarModal({
         setError(result.error)
       } else {
         setSuccess(true)
+        if (result.transaccionId) {
+          onSuccess?.({
+            transaccionId: result.transaccionId,
+            fechaAnterior: result.fechaAnterior ?? null,
+            cuentaId: result.cuentaId ?? null,
+            monto: val,
+          })
+        }
         setTimeout(() => onOpenChange(false), 1200)
       }
     })
   }
+
+  const cuentaSeleccionada = cuentas.find((c) => c.id === cuentaId)
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -183,6 +200,13 @@ export default function PagarModal({
                   onChange={(e) => setMonto(e.target.value)}
                 />
               </div>
+
+              {/* Impacto en saldo */}
+              <p className="mb-4 text-xs text-muted-foreground">
+                {cuentaSeleccionada
+                  ? `Se descontará de: ${cuentaSeleccionada.nombre}`
+                  : 'No descontará de ninguna cuenta — solo queda registrado.'}
+              </p>
 
               {error && (
                 <p className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

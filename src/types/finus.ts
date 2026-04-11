@@ -53,8 +53,10 @@ export interface Tarjeta {
   pago_sin_intereses: number | null
   /** Pago mínimo requerido */
   pago_minimo: number | null
-  fecha_corte: number | null   // día del mes
-  fecha_limite_pago: number | null // día del mes
+  titular_nombre: string | null
+  ultimos_4: string | null
+  dia_corte: number | null   // día del mes
+  dia_limite_pago: number | null // día del mes
   tasa_interes_mensual: number | null
   activa: boolean
   created_at: string

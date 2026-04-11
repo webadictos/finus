@@ -101,8 +101,10 @@ export interface Database {
           saldo_al_corte: number | null
           pago_sin_intereses: number | null
           pago_minimo: number | null
-          fecha_corte: number | null
-          fecha_limite_pago: number | null
+          titular_nombre: string | null
+          ultimos_4: string | null
+          dia_corte: number | null
+          dia_limite_pago: number | null
           tasa_interes_mensual: number | null
           activa: boolean
           created_at: string
@@ -115,13 +117,15 @@ export interface Database {
           banco: string
           tipo: 'credito' | 'departamental'
           titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
+          titular_nombre?: string | null
+          ultimos_4?: string | null
           limite_credito?: number
           saldo_actual?: number
           saldo_al_corte?: number | null
           pago_sin_intereses?: number | null
           pago_minimo?: number | null
-          fecha_corte?: number | null
-          fecha_limite_pago?: number | null
+          dia_corte?: number | null
+          dia_limite_pago?: number | null
           tasa_interes_mensual?: number | null
           activa?: boolean
           created_at?: string
@@ -134,13 +138,14 @@ export interface Database {
           banco?: string
           tipo?: 'credito' | 'departamental'
           titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
+          titular_nombre?: string | null
+          ultimos_4?: string | null
           limite_credito?: number
           saldo_actual?: number
           saldo_al_corte?: number | null
           pago_sin_intereses?: number | null
-          pago_minimo?: number | null
-          fecha_corte?: number | null
-          fecha_limite_pago?: number | null
+          dia_corte?: number | null
+          dia_limite_pago?: number | null
           tasa_interes_mensual?: number | null
           activa?: boolean
           updated_at?: string

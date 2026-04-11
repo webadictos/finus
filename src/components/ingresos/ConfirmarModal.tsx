@@ -2,12 +2,15 @@
 
 import { useState, useTransition } from 'react'
 import { Dialog } from 'radix-ui'
-import { X, CheckCircle } from 'lucide-react'
+import { X, CheckCircle, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { confirmarIngreso } from '@/app/(dashboard)/ingresos/actions'
 import { formatMXN } from '@/lib/format'
+import type { Database } from '@/types/database'
+
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   open: boolean
@@ -17,6 +20,16 @@ interface Props {
   montoEsperado: number
   esRecurrente: boolean
   frecuencia: string | null
+  /** Lista de cuentas disponibles para seleccionar */
+  cuentas: Cuenta[]
+  /** FK actual del ingreso — null significa que no tiene cuenta asignada todavía */
+  cuentaDestinoId?: string | null
+  onSuccess?: (data: {
+    transaccionId: string
+    nextIngresoId: string | null
+    monto: number
+    cuentaId: string | null
+  }) => void
 }
 
 export default function ConfirmarModal({
@@ -27,18 +40,31 @@ export default function ConfirmarModal({
   montoEsperado,
   esRecurrente,
   frecuencia,
+  cuentas,
+  cuentaDestinoId,
+  onSuccess,
 }: Props) {
   const today = new Date().toISOString().split('T')[0]
   const [monto, setMonto] = useState(String(montoEsperado))
   const [fecha, setFecha] = useState(today)
+  const [selectedCuentaId, setSelectedCuentaId] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  const hasCuenta = !!cuentaDestinoId
+  const cuentaNombre = hasCuenta
+    ? (cuentas.find((c) => c.id === cuentaDestinoId)?.nombre ?? null)
+    : null
+
+  const selectClass =
+    'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setMonto(String(montoEsperado))
       setFecha(today)
+      setSelectedCuentaId('')
       setError(null)
       setSuccess(false)
     }
@@ -55,14 +81,34 @@ export default function ConfirmarModal({
       setError('Ingresa la fecha de recepción')
       return
     }
+    if (!hasCuenta && !selectedCuentaId) {
+      setError('Selecciona la cuenta a la que llegó este ingreso')
+      return
+    }
     setError(null)
 
+    // La cuenta efectiva: si el ingreso ya tenía una, usarla; si no, usar la seleccionada ahora
+    const efectivaCuentaId = hasCuenta ? cuentaDestinoId! : selectedCuentaId
+
     startTransition(async () => {
-      const result = await confirmarIngreso(ingresoId, val, fecha)
+      const result = await confirmarIngreso(
+        ingresoId,
+        val,
+        fecha,
+        hasCuenta ? undefined : efectivaCuentaId
+      )
       if (result.error) {
         setError(result.error)
       } else {
         setSuccess(true)
+        if (result.transaccionId) {
+          onSuccess?.({
+            transaccionId: result.transaccionId,
+            nextIngresoId: result.nextIngresoId ?? null,
+            monto: val,
+            cuentaId: efectivaCuentaId,
+          })
+        }
         setTimeout(() => onOpenChange(false), 1200)
       }
     })
@@ -105,7 +151,8 @@ export default function ConfirmarModal({
             <>
               {/* Referencia esperado */}
               <p className="mb-4 text-sm text-muted-foreground">
-                Esperado: <span className="font-medium text-foreground">{formatMXN(montoEsperado)}</span>
+                Esperado:{' '}
+                <span className="font-medium text-foreground">{formatMXN(montoEsperado)}</span>
               </p>
 
               {/* Monto real */}
@@ -131,6 +178,39 @@ export default function ConfirmarModal({
                   onChange={(e) => setFecha(e.target.value)}
                 />
               </div>
+
+              {/* Selector de cuenta — obligatorio si el ingreso no tiene una asignada */}
+              {!hasCuenta ? (
+                <div className="flex flex-col gap-1.5 mb-4">
+                  <Label htmlFor="cuenta-destino" className="flex items-center gap-1.5">
+                    <AlertCircle className="size-3.5 text-orange-500" />
+                    ¿A qué cuenta llegó este dinero?
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="cuenta-destino"
+                    value={selectedCuentaId}
+                    onChange={(e) => setSelectedCuentaId(e.target.value)}
+                    className={selectClass}
+                    required
+                  >
+                    <option value="">— Selecciona una cuenta —</option>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre} ({formatMXN(Number(c.saldo_actual ?? 0))})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    El saldo de la cuenta seleccionada se incrementará.
+                  </p>
+                </div>
+              ) : (
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Se sumará al saldo de:{' '}
+                  <span className="font-medium text-foreground">{cuentaNombre}</span>
+                </p>
+              )}
 
               {esRecurrente && frecuencia && (
                 <p className="mb-4 rounded-md bg-blue-500/10 px-3 py-2 text-xs text-blue-700 dark:text-blue-400">

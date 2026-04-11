@@ -45,13 +45,19 @@ async function DashboardData() {
   const ingresos: Ingreso[] = ingresosRes.data ?? []
   const compromisos: Compromiso[] = compromisosRes.data ?? []
 
+  // Ingresos confirmados sin cuenta_destino_id: no llamaron incrementar_saldo,
+  // por lo que no están reflejados en cuentas.saldo_actual.
+  const ingresosSinCuenta = ingresos
+    .filter((i) => i.estado === 'confirmado' && !i.cuenta_destino_id)
+    .reduce((sum, i) => sum + Number(i.monto_real ?? i.monto_esperado ?? 0), 0)
+
   const saldoDisponible = cuentas
     .filter((c) => c.tipo !== 'inversion')
-    .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
+    .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0) + ingresosSinCuenta
 
   return (
     <>
-      <SaldoHeader cuentas={cuentas} />
+      <SaldoHeader cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
       <KPICards cuentas={cuentas} ingresos={ingresos} compromisos={compromisos} />
       <AconsejameButton />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

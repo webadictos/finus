@@ -93,16 +93,16 @@ export default async function TarjetasPage() {
                     </span>
                   </span>
                 ) : null}
-                {t.fecha_corte != null && (
+                {t.dia_corte != null && (
                   <span>
                     Corte día{' '}
-                    <span className="font-medium text-foreground">{t.fecha_corte}</span>
+                    <span className="font-medium text-foreground">{t.dia_corte}</span>
                   </span>
                 )}
-                {t.fecha_limite_pago != null && (
+                {t.dia_limite_pago != null && (
                   <span>
                     Límite pago día{' '}
-                    <span className="font-medium text-foreground">{t.fecha_limite_pago}</span>
+                    <span className="font-medium text-foreground">{t.dia_limite_pago}</span>
                   </span>
                 )}
               </div>

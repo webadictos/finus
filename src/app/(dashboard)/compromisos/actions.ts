@@ -6,6 +6,14 @@ import type { TipoPago } from '@/types/finus'
 
 export type ActionResult = { error?: string }
 
+export type MarcarPagadoResult = {
+  error?: string
+  transaccionId?: string
+  fechaAnterior?: string | null
+  cuentaId?: string | null
+  monto?: number
+}
+
 export async function crearCompromiso(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const {
@@ -101,7 +109,7 @@ export async function marcarPagado(
   id: string,
   montoPagado: number,
   cuentaId?: string | null
-): Promise<ActionResult> {
+): Promise<MarcarPagadoResult> {
   const supabase = await createClient()
   const {
     data: { user },
@@ -118,10 +126,12 @@ export async function marcarPagado(
 
   if (fetchError || !compromiso) return { error: 'Compromiso no encontrado' }
 
+  const fechaAnterior = compromiso.fecha_proximo_pago
+
   // Calcular siguiente fecha de pago (+1 mes)
   let siguienteFecha: string | null = null
-  if (compromiso.fecha_proximo_pago) {
-    const d = new Date(compromiso.fecha_proximo_pago + 'T12:00:00')
+  if (fechaAnterior) {
+    const d = new Date(fechaAnterior + 'T12:00:00')
     d.setMonth(d.getMonth() + 1)
     siguienteFecha = d.toISOString().split('T')[0]
   }
@@ -129,15 +139,19 @@ export async function marcarPagado(
   const hoy = new Date().toISOString().split('T')[0]
 
   // Crear transacción de pago
-  const { error: txError } = await supabase.from('transacciones').insert({
-    usuario_id: user.id,
-    compromiso_id: id,
-    monto: montoPagado,
-    tipo: 'gasto' as const,
-    descripcion: `Pago: ${compromiso.nombre}`,
-    fecha: hoy,
-    cuenta_id: cuentaId ?? null,
-  })
+  const { data: txData, error: txError } = await supabase
+    .from('transacciones')
+    .insert({
+      usuario_id: user.id,
+      compromiso_id: id,
+      monto: montoPagado,
+      tipo: 'gasto' as const,
+      descripcion: `Pago: ${compromiso.nombre}`,
+      fecha: hoy,
+      cuenta_id: cuentaId ?? null,
+    })
+    .select('id')
+    .single()
 
   if (txError) return { error: txError.message }
 
@@ -157,6 +171,55 @@ export async function marcarPagado(
     .eq('usuario_id', user.id)
 
   if (updateError) return { error: updateError.message }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {
+    transaccionId: txData.id,
+    fechaAnterior,
+    cuentaId: cuentaId ?? null,
+    monto: montoPagado,
+  }
+}
+
+export async function deshacerMarcarPagado(
+  transaccionId: string,
+  compromisoId: string,
+  fechaAnterior: string | null,
+  cuentaId: string | null,
+  monto: number
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // 1. Eliminar la transacción
+  const { error: txErr } = await supabase
+    .from('transacciones')
+    .delete()
+    .eq('id', transaccionId)
+    .eq('usuario_id', user.id)
+
+  if (txErr) return { error: txErr.message }
+
+  // 2. Revertir saldo si aplica
+  if (cuentaId) {
+    await supabase.rpc('incrementar_saldo', {
+      p_cuenta_id: cuentaId,
+      p_monto: monto,
+    })
+  }
+
+  // 3. Restaurar fecha_proximo_pago anterior
+  const { error: updateErr } = await supabase
+    .from('compromisos')
+    .update({ fecha_proximo_pago: fechaAnterior })
+    .eq('id', compromisoId)
+    .eq('usuario_id', user.id)
+
+  if (updateErr) return { error: updateErr.message }
 
   revalidatePath('/compromisos')
   revalidatePath('/')

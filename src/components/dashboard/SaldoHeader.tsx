@@ -6,12 +6,16 @@ type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   cuentas: Cuenta[]
+  /** Suma de monto_real de ingresos confirmados sin cuenta_destino_id (no contabilizados en cuentas) */
+  ingresosSinCuenta?: number
 }
 
-export default function SaldoHeader({ cuentas }: Props) {
-  const saldoTotal = cuentas
+export default function SaldoHeader({ cuentas, ingresosSinCuenta = 0 }: Props) {
+  const saldoCuentas = cuentas
     .filter((c) => c.activa && c.tipo !== 'inversion')
     .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
+
+  const saldoTotal = saldoCuentas + ingresosSinCuenta
 
   const positivo = saldoTotal >= 0
 
@@ -41,6 +45,11 @@ export default function SaldoHeader({ cuentas }: Props) {
         <p className="mt-1 text-xs text-muted-foreground">
           {cuentas.filter((c) => c.activa && c.tipo !== 'inversion').length}{' '}
           cuenta(s) — sin incluir inversiones
+          {ingresosSinCuenta > 0 && (
+            <span className="ml-2 text-emerald-600">
+              + {formatMXN(ingresosSinCuenta)} en ingresos confirmados sin cuenta
+            </span>
+          )}
         </p>
       )}
     </div>

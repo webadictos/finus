@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { Pencil, CheckCircle2, RefreshCw } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { Pencil, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Badge from '@/components/shared/Badge'
+import UndoBar from '@/components/shared/UndoBar'
 import IngresoForm from '@/components/ingresos/IngresoForm'
 import ConfirmarModal from '@/components/ingresos/ConfirmarModal'
+import { deshacerConfirmarIngreso, acreditarIngreso } from '@/app/(dashboard)/ingresos/actions'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
@@ -40,6 +42,16 @@ const ESTADO_LABEL: Record<string, { label: string; variant: BadgeVariant }> = {
   en_riesgo: { label: 'En riesgo', variant: 'error' },
 }
 
+// ─── Tipos ────────────────────────────────────────────────────────────────────
+
+type UndoData = {
+  ingresoId: string
+  transaccionId: string
+  nextIngresoId: string | null
+  cuentaId: string | null
+  monto: number
+}
+
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 interface Props {
@@ -50,12 +62,64 @@ interface Props {
 export default function IngresoCard({ ingreso, cuentas }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [confirmarOpen, setConfirmarOpen] = useState(false)
+  const [undoData, setUndoData] = useState<UndoData | null>(null)
+
+  // Estado para el panel "Acreditar" (ingresos confirmados sin cuenta)
+  const [acreditarCuentaId, setAcreditarCuentaId] = useState('')
+  const [acreditarError, setAcreditarError] = useState<string | null>(null)
+  const [acreditarPending, startAcreditar] = useTransition()
 
   const confirmado = ingreso.estado === 'confirmado'
   const monto = Number(ingreso.monto_esperado ?? 0)
   const montoReal = ingreso.monto_real != null ? Number(ingreso.monto_real) : null
   const dias = ingreso.fecha_esperada ? diasHastaFecha(ingreso.fecha_esperada) : null
   const estadoInfo = ESTADO_LABEL[ingreso.estado] ?? ESTADO_LABEL.esperado
+
+  const necesitaAcreditar = confirmado && !ingreso.cuenta_destino_id
+
+  const handleConfirmarSuccess = (data: {
+    transaccionId: string
+    nextIngresoId: string | null
+    monto: number
+    cuentaId: string | null
+  }) => {
+    setUndoData({
+      ingresoId: ingreso.id,
+      transaccionId: data.transaccionId,
+      nextIngresoId: data.nextIngresoId,
+      cuentaId: data.cuentaId,
+      monto: data.monto,
+    })
+  }
+
+  const handleUndo = async () => {
+    if (!undoData) return { error: 'Sin datos para deshacer' }
+    return deshacerConfirmarIngreso(
+      undoData.ingresoId,
+      undoData.transaccionId,
+      undoData.cuentaId,
+      undoData.monto,
+      undoData.nextIngresoId
+    )
+  }
+
+  const handleAcreditar = () => {
+    if (!acreditarCuentaId) {
+      setAcreditarError('Selecciona una cuenta')
+      return
+    }
+    setAcreditarError(null)
+    startAcreditar(async () => {
+      const result = await acreditarIngreso(ingreso.id, acreditarCuentaId)
+      if (result.error) {
+        setAcreditarError(result.error)
+      }
+      // On success page revalidates, card disappears from "sin cuenta" state
+    })
+  }
+
+  const selectClass =
+    'h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
 
   return (
     <>
@@ -153,6 +217,55 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
             </Button>
           </div>
         )}
+
+        {/* Aviso: confirmado pero sin cuenta — acreditar */}
+        {necesitaAcreditar && (
+          <div className="flex flex-col gap-2 rounded-md border border-orange-300 bg-orange-500/10 px-3 py-3">
+            <div className="flex items-start gap-2 text-orange-700 dark:text-orange-400">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+              <p className="text-xs leading-snug">
+                <span className="font-semibold">No acreditado a ninguna cuenta.</span>{' '}
+                ¿A cuál cuenta llegó este dinero?
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={acreditarCuentaId}
+                onChange={(e) => {
+                  setAcreditarCuentaId(e.target.value)
+                  setAcreditarError(null)
+                }}
+                className={`${selectClass} flex-1`}
+              >
+                <option value="">— Selecciona cuenta —</option>
+                {cuentas.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} ({formatMXN(Number(c.saldo_actual ?? 0))})
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                onClick={handleAcreditar}
+                disabled={acreditarPending || !acreditarCuentaId}
+              >
+                {acreditarPending ? 'Acreditando…' : 'Acreditar'}
+              </Button>
+            </div>
+            {acreditarError && (
+              <p className="text-xs text-destructive">{acreditarError}</p>
+            )}
+          </div>
+        )}
+
+        {/* UndoBar */}
+        {undoData && (
+          <UndoBar
+            mensaje="Ingreso confirmado"
+            onUndo={handleUndo}
+            onDismiss={() => setUndoData(null)}
+          />
+        )}
       </div>
 
       {/* Modales */}
@@ -172,6 +285,9 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
           montoEsperado={monto}
           esRecurrente={ingreso.es_recurrente}
           frecuencia={ingreso.frecuencia}
+          cuentas={cuentas}
+          cuentaDestinoId={ingreso.cuenta_destino_id}
+          onSuccess={handleConfirmarSuccess}
         />
       )}
     </>

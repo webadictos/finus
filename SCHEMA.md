@@ -69,8 +69,8 @@
 | saldo_al_corte | numeric\|null | monto del estado de cuenta al corte |
 | pago_sin_intereses | numeric\|null | ⚠️ capturado del estado de cuenta real, NO calculado |
 | pago_minimo | numeric\|null | ⚠️ capturado del estado de cuenta real, NO calculado |
-| fecha_corte | int\|null | día del mes (ej: 5) |
-| fecha_limite_pago | int\|null | día del mes (ej: 20) |
+| dia_corte | int\|null | día del mes (ej: 5) |
+| dia_limite_pago | int\|null | día del mes (ej: 20) |
 | tasa_interes_mensual | numeric\|null | en tarjetas es mensual (a diferencia de compromisos) |
 | **activa** | boolean | ⚠️ femenino → `.eq('activa', true)` |
 | created_at | timestamptz | |

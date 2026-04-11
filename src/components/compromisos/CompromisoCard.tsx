@@ -5,9 +5,11 @@ import { Pencil, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Badge from '@/components/shared/Badge'
 import ProgressBar from '@/components/shared/ProgressBar'
+import UndoBar from '@/components/shared/UndoBar'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import CompromisoForm from '@/components/compromisos/CompromisoForm'
 import PagarModal from '@/components/compromisos/PagarModal'
+import { deshacerMarcarPagado } from '@/app/(dashboard)/compromisos/actions'
 import { getRecomendacion } from '@/lib/recommendations'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
@@ -52,6 +54,14 @@ const PRIORIDAD_VARIANT: Record<string, BadgeVariant> = {
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
+type UndoData = {
+  transaccionId: string
+  compromisoId: string
+  fechaAnterior: string | null
+  cuentaId: string | null
+  monto: number
+}
+
 export default function CompromisoCard({
   compromiso,
   saldoDisponible,
@@ -61,6 +71,7 @@ export default function CompromisoCard({
 }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [pagarOpen, setPagarOpen] = useState(false)
+  const [undoData, setUndoData] = useState<UndoData | null>(null)
 
   const monto = Number(compromiso.monto_mensualidad ?? 0)
   const pagoMin = compromiso.pago_minimo != null ? Number(compromiso.pago_minimo) : null
@@ -174,6 +185,23 @@ export default function CompromisoCard({
             Marcar pagado
           </Button>
         )}
+
+        {/* UndoBar */}
+        {undoData && (
+          <UndoBar
+            mensaje="Pago registrado"
+            onUndo={() =>
+              deshacerMarcarPagado(
+                undoData.transaccionId,
+                undoData.compromisoId,
+                undoData.fechaAnterior,
+                undoData.cuentaId,
+                undoData.monto
+              )
+            }
+            onDismiss={() => setUndoData(null)}
+          />
+        )}
       </div>
 
       {/* Modales */}
@@ -195,6 +223,15 @@ export default function CompromisoCard({
         esRevolvente={compromiso.tipo_pago === 'revolvente'}
         recomendacion={recomendacion}
         cuentas={cuentas}
+        onSuccess={(data) =>
+          setUndoData({
+            transaccionId: data.transaccionId,
+            compromisoId: compromiso.id,
+            fechaAnterior: data.fechaAnterior,
+            cuentaId: data.cuentaId,
+            monto: data.monto,
+          })
+        }
       />
     </>
   )

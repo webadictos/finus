@@ -13,8 +13,10 @@ export async function crearTarjeta(formData: FormData): Promise<ActionResult> {
   if (!user) return { error: 'No autenticado' }
 
   const limiteCredito = parseFloat(formData.get('limite_credito') as string)
-  const fechaCorte = parseInt(formData.get('fecha_corte') as string)
-  const fechaLimitePago = parseInt(formData.get('fecha_limite_pago') as string)
+  const diaCorte = parseInt(formData.get('dia_corte') as string)
+  const diaLimitePago = parseInt(formData.get('dia_limite_pago') as string)
+  const titularNombre = (formData.get('titular_nombre') as string)?.trim() || null
+  const ultimos4 = (formData.get('ultimos_4') as string)?.trim() || null
 
   const { error } = await supabase.from('tarjetas').insert({
     usuario_id: user.id,
@@ -28,9 +30,11 @@ export async function crearTarjeta(formData: FormData): Promise<ActionResult> {
         | 'familiar'
         | 'empresa'
         | 'tercero',
+    titular_nombre: titularNombre,
+    ultimos_4: ultimos4,
     limite_credito: !isNaN(limiteCredito) && limiteCredito > 0 ? limiteCredito : 0,
-    fecha_corte: !isNaN(fechaCorte) && fechaCorte > 0 ? fechaCorte : null,
-    fecha_limite_pago: !isNaN(fechaLimitePago) && fechaLimitePago > 0 ? fechaLimitePago : null,
+    dia_corte: !isNaN(diaCorte) && diaCorte > 0 ? diaCorte : null,
+    dia_limite_pago: !isNaN(diaLimitePago) && diaLimitePago > 0 ? diaLimitePago : null,
     activa: true,
   })
 
@@ -52,8 +56,10 @@ export async function actualizarTarjeta(
   if (!user) return { error: 'No autenticado' }
 
   const limiteCredito = parseFloat(formData.get('limite_credito') as string)
-  const fechaCorte = parseInt(formData.get('fecha_corte') as string)
-  const fechaLimitePago = parseInt(formData.get('fecha_limite_pago') as string)
+  const diaCorte = parseInt(formData.get('dia_corte') as string)
+  const diaLimitePago = parseInt(formData.get('dia_limite_pago') as string)
+  const titularNombre = (formData.get('titular_nombre') as string)?.trim() || null
+  const ultimos4 = (formData.get('ultimos_4') as string)?.trim() || null
 
   const { error } = await supabase
     .from('tarjetas')
@@ -68,9 +74,11 @@ export async function actualizarTarjeta(
           | 'familiar'
           | 'empresa'
           | 'tercero',
+      titular_nombre: titularNombre,
+      ultimos_4: ultimos4,
       limite_credito: !isNaN(limiteCredito) && limiteCredito > 0 ? limiteCredito : 0,
-      fecha_corte: !isNaN(fechaCorte) && fechaCorte > 0 ? fechaCorte : null,
-      fecha_limite_pago: !isNaN(fechaLimitePago) && fechaLimitePago > 0 ? fechaLimitePago : null,
+      dia_corte: !isNaN(diaCorte) && diaCorte > 0 ? diaCorte : null,
+      dia_limite_pago: !isNaN(diaLimitePago) && diaLimitePago > 0 ? diaLimitePago : null,
     })
     .eq('id', id)
     .eq('usuario_id', user.id)
