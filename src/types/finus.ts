@@ -108,12 +108,19 @@ export interface GastoPrevisto {
   id: string
   usuario_id: string
   nombre: string
-  tipo_programacion: TipoProgramacion
   monto_estimado: number
+  tipo_programacion: TipoProgramacion
+  frecuencia_dias: number | null
+  ultima_ocurrencia: string | null
+  mes: string | null // YYYY-MM
+  ventana_dias: number | null
   certeza: NivelCerteza
-  fecha_estimada: string | null
-  mes_estimado: string | null // YYYY-MM
+  fecha_sugerida: string | null
+  fecha_confirmada: string | null
+  realizado: boolean
+  monto_real: number | null
   notas: string | null
+  activo: boolean
   created_at: string
 }
 
