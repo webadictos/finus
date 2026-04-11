@@ -138,7 +138,7 @@
 | saldo_real | numeric\|null | saldo real de la tarjeta (solo revolvente) |
 | pago_sin_intereses | numeric\|null | solo revolvente — estimado por Finus |
 | pago_minimo | numeric\|null | solo revolvente — estimado por Finus |
-| fecha_corte | int\|null | día del mes |
+| fecha_corte | date\|null | fecha de corte |
 | **tasa_interes_anual** | numeric\|null | ⚠️ NO `tasa_interes_mensual`; dividir /12 para cálculos mensuales |
 | prioridad | enum\|null | `alta \| media \| baja` |
 | **activo** | boolean | ⚠️ masculino → `.eq('activo', true)` |

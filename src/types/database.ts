@@ -263,7 +263,7 @@ export interface Database {
           saldo_real: number | null
           pago_sin_intereses: number | null
           pago_minimo: number | null
-          fecha_corte: number | null
+          fecha_corte: string | null
           tasa_interes_anual: number | null
           prioridad: 'alta' | 'media' | 'baja' | null
           activo: boolean
@@ -289,7 +289,7 @@ export interface Database {
           saldo_real?: number | null
           pago_sin_intereses?: number | null
           pago_minimo?: number | null
-          fecha_corte?: number | null
+          fecha_corte?: string | null
           tasa_interes_anual?: number | null
           prioridad?: 'alta' | 'media' | 'baja' | null
           activo?: boolean
@@ -315,7 +315,7 @@ export interface Database {
           saldo_real?: number | null
           pago_sin_intereses?: number | null
           pago_minimo?: number | null
-          fecha_corte?: number | null
+          fecha_corte?: string | null
           tasa_interes_anual?: number | null
           prioridad?: 'alta' | 'media' | 'baja' | null
           activo?: boolean

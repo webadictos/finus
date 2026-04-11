@@ -310,7 +310,7 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | saldo_real | numeric\|null | Saldo real de la tarjeta |
 | pago_sin_intereses | numeric\|null | |
 | pago_minimo | numeric\|null | |
-| fecha_corte | int\|null | Día del mes |
+| fecha_corte | date\|null | Fecha de corte |
 | **tasa_interes_anual** | numeric\|null | ⚠️ NO `tasa_interes_mensual`; dividir /12 para cálculos mensuales |
 | prioridad | enum\|null | `alta \| media \| baja` |
 | **activo** | boolean | ⚠️ Es `activo` (masculino), NO `activa` |

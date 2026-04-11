@@ -102,6 +102,17 @@ export default function CompromisoCard({
     ? diasHastaFecha(compromiso.fecha_proximo_pago)
     : null
 
+  const showLiquidacion =
+    compromiso.tipo_pago === 'msi' || compromiso.tipo_pago === 'prestamo'
+  const mensualidadesRestantes =
+    compromiso.mensualidades_restantes != null ? compromiso.mensualidades_restantes : null
+  const mesTotales =
+    compromiso.meses_totales != null ? compromiso.meses_totales : null
+  const pagosRealizados =
+    mesTotales != null && mensualidadesRestantes != null
+      ? mesTotales - mensualidadesRestantes
+      : null
+
   const recomendacion = getRecomendacion(
     {
       tipo_pago: compromiso.tipo_pago,
@@ -194,6 +205,27 @@ export default function CompromisoCard({
 
         {/* Recomendación */}
         <RecomendacionBadge recomendacion={recomendacion} />
+
+        {/* Liquidación: pagos restantes y barra de progreso (MSI / Préstamo) */}
+        {showLiquidacion && (mensualidadesRestantes != null || compromiso.fecha_fin_estimada) && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              {mensualidadesRestantes != null && (
+                <span>
+                  <span className="font-medium text-foreground">{mensualidadesRestantes}</span> pago{mensualidadesRestantes !== 1 ? 's' : ''} restante{mensualidadesRestantes !== 1 ? 's' : ''}
+                </span>
+              )}
+              {compromiso.fecha_fin_estimada && (
+                <span>
+                  Último pago: <span className="font-medium text-foreground">{formatFecha(compromiso.fecha_fin_estimada)}</span>
+                </span>
+              )}
+            </div>
+            {mesTotales != null && mensualidadesRestantes != null && pagosRealizados != null && (
+              <ProgressBar value={pagosRealizados} max={mesTotales} />
+            )}
+          </div>
+        )}
 
         {/* Footer: pagado o botón */}
         {pagadoEsteMes != null ? (

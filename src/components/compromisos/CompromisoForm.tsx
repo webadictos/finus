@@ -42,6 +42,8 @@ interface FormState {
   monto_mensualidad: string
   fecha_proximo_pago: string
   mensualidades_restantes: string
+  fecha_fin_estimada: string
+  meses_totales: string
   prioridad: string
   tarjeta_id: string
   saldo_real: string
@@ -59,6 +61,8 @@ function initialForm(c?: Compromiso | null): FormState {
       monto_mensualidad: '',
       fecha_proximo_pago: '',
       mensualidades_restantes: '',
+      fecha_fin_estimada: '',
+      meses_totales: '',
       prioridad: '',
       tarjeta_id: '',
       saldo_real: '',
@@ -74,6 +78,8 @@ function initialForm(c?: Compromiso | null): FormState {
     monto_mensualidad: c.monto_mensualidad != null ? String(Number(c.monto_mensualidad)) : '',
     fecha_proximo_pago: c.fecha_proximo_pago ?? '',
     mensualidades_restantes: c.mensualidades_restantes != null ? String(c.mensualidades_restantes) : '',
+    fecha_fin_estimada: c.fecha_fin_estimada ?? '',
+    meses_totales: c.meses_totales != null ? String(c.meses_totales) : '',
     prioridad: c.prioridad ?? '',
     tarjeta_id: c.tarjeta_id ?? '',
     saldo_real: c.saldo_real != null ? String(Number(c.saldo_real)) : '',
@@ -112,8 +118,36 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
     onOpenChange(next)
   }
 
-  const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm((p) => ({ ...p, [key]: e.target.value }))
+  const set = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const value = e.target.value
+    setForm((p) => {
+      const next = { ...p, [key]: value }
+
+      // Mutual calculation between mensualidades_restantes and fecha_fin_estimada
+      if (key === 'mensualidades_restantes' && next.fecha_proximo_pago) {
+        const n = parseInt(value)
+        if (!isNaN(n) && n > 0) {
+          const base = new Date(next.fecha_proximo_pago + 'T12:00:00')
+          base.setMonth(base.getMonth() + (n - 1))
+          next.fecha_fin_estimada = base.toISOString().split('T')[0]
+        } else {
+          next.fecha_fin_estimada = ''
+        }
+      }
+
+      if (key === 'fecha_fin_estimada' && value && next.fecha_proximo_pago) {
+        const inicio = new Date(next.fecha_proximo_pago + 'T12:00:00')
+        const fin = new Date(value + 'T12:00:00')
+        const meses =
+          (fin.getFullYear() - inicio.getFullYear()) * 12 +
+          (fin.getMonth() - inicio.getMonth()) +
+          1
+        next.mensualidades_restantes = meses > 0 ? String(meses) : ''
+      }
+
+      return next
+    })
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -143,7 +177,29 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
 
   const isRevolvente = form.tipo_pago === 'revolvente'
   const isMSI = form.tipo_pago === 'msi'
+  const isPrestamo = form.tipo_pago === 'prestamo'
   const isEditing = !!compromiso
+
+  // Computed display values for liquidation fields
+  const fechaFinCalculada = (() => {
+    if (!form.mensualidades_restantes || !form.fecha_proximo_pago) return null
+    const n = parseInt(form.mensualidades_restantes)
+    if (isNaN(n) || n <= 0) return null
+    const base = new Date(form.fecha_proximo_pago + 'T12:00:00')
+    base.setMonth(base.getMonth() + (n - 1))
+    return base.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+  })()
+
+  const mensualidadesCalculadas = (() => {
+    if (!form.fecha_fin_estimada || !form.fecha_proximo_pago) return null
+    const inicio = new Date(form.fecha_proximo_pago + 'T12:00:00')
+    const fin = new Date(form.fecha_fin_estimada + 'T12:00:00')
+    const meses =
+      (fin.getFullYear() - inicio.getFullYear()) * 12 +
+      (fin.getMonth() - inicio.getMonth()) +
+      1
+    return meses > 0 ? meses : null
+  })()
 
   const selectClass =
     'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
@@ -246,19 +302,57 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                 />
               </div>
 
-              {/* MSI: mensualidades restantes */}
-              {isMSI && (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="mensualidades_restantes">Mensualidades restantes</Label>
-                  <Input
-                    id="mensualidades_restantes"
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="ej. 12"
-                    value={form.mensualidades_restantes}
-                    onChange={set('mensualidades_restantes')}
-                  />
+              {/* MSI / Préstamo: campos de liquidación */}
+              {(isMSI || isPrestamo) && (
+                <div className="rounded-md border border-dashed p-3">
+                  <p className="mb-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Liquidación
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="mensualidades_restantes">Mensualidades restantes</Label>
+                      <Input
+                        id="mensualidades_restantes"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="ej. 12"
+                        value={form.mensualidades_restantes}
+                        onChange={set('mensualidades_restantes')}
+                      />
+                      {fechaFinCalculada && (
+                        <p className="text-xs text-muted-foreground">
+                          Último pago estimado: <span className="font-medium text-foreground">{fechaFinCalculada}</span>
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="fecha_fin_estimada">Fecha de último pago (opcional)</Label>
+                      <Input
+                        id="fecha_fin_estimada"
+                        type="date"
+                        value={form.fecha_fin_estimada}
+                        onChange={set('fecha_fin_estimada')}
+                      />
+                      {mensualidadesCalculadas !== null && !form.mensualidades_restantes && (
+                        <p className="text-xs text-muted-foreground">
+                          Mensualidades calculadas: <span className="font-medium text-foreground">{mensualidadesCalculadas}</span>
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="meses_totales">Meses totales del plan (opcional)</Label>
+                      <Input
+                        id="meses_totales"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="ej. 18"
+                        value={form.meses_totales}
+                        onChange={set('meses_totales')}
+                      />
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -37,6 +37,10 @@ export async function crearCompromiso(formData: FormData): Promise<ActionResult>
     mensualidades_restantes: formData.get('mensualidades_restantes')
       ? parseInt(formData.get('mensualidades_restantes') as string)
       : null,
+    fecha_fin_estimada: (formData.get('fecha_fin_estimada') as string) || null,
+    meses_totales: formData.get('meses_totales')
+      ? parseInt(formData.get('meses_totales') as string)
+      : null,
     saldo_real: formData.get('saldo_real')
       ? parseFloat(formData.get('saldo_real') as string)
       : null,
@@ -83,6 +87,10 @@ export async function actualizarCompromiso(
       tarjeta_id: tarjetaId,
       mensualidades_restantes: formData.get('mensualidades_restantes')
         ? parseInt(formData.get('mensualidades_restantes') as string)
+        : null,
+      fecha_fin_estimada: (formData.get('fecha_fin_estimada') as string) || null,
+      meses_totales: formData.get('meses_totales')
+        ? parseInt(formData.get('meses_totales') as string)
         : null,
       saldo_real: formData.get('saldo_real')
         ? parseFloat(formData.get('saldo_real') as string)
