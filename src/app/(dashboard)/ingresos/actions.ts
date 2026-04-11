@@ -288,6 +288,63 @@ export async function deshacerConfirmarIngreso(
   return {}
 }
 
+export async function eliminarIngreso(
+  id: string,
+  alcance: 'este_mes' | 'todos_siguientes'
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { data: ingreso, error: fetchErr } = await supabase
+    .from('ingresos')
+    .select('nombre, estado, cuenta_destino_id, monto_real, monto_esperado, es_recurrente, fecha_esperada')
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchErr || !ingreso) return { error: 'Ingreso no encontrado' }
+
+  // Revertir saldo si estaba confirmado y tenía cuenta
+  if (ingreso.estado === 'confirmado' && ingreso.cuenta_destino_id) {
+    const monto = Number(ingreso.monto_real ?? ingreso.monto_esperado ?? 0)
+    if (monto > 0) {
+      await supabase.rpc('decrementar_saldo', {
+        p_cuenta_id: ingreso.cuenta_destino_id,
+        p_monto: monto,
+      })
+    }
+  }
+
+  // Eliminar este registro
+  const { error: deleteErr } = await supabase
+    .from('ingresos')
+    .delete()
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (deleteErr) return { error: deleteErr.message }
+
+  // Si 'todos_siguientes': eliminar instancias futuras no confirmadas de la misma serie
+  if (alcance === 'todos_siguientes' && ingreso.es_recurrente) {
+    const hoy = new Date().toISOString().split('T')[0]
+    await supabase
+      .from('ingresos')
+      .delete()
+      .eq('usuario_id', user.id)
+      .eq('nombre', ingreso.nombre)
+      .eq('es_recurrente', true)
+      .neq('estado', 'confirmado')
+      .gte('fecha_esperada', hoy)
+  }
+
+  revalidatePath('/ingresos')
+  revalidatePath('/')
+  return {}
+}
+
 /**
  * Acredita un ingreso ya confirmado que no tenía cuenta_destino_id.
  * Actualiza el ingreso, la transacción existente y llama incrementar_saldo.

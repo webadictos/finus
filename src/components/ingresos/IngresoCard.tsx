@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Pencil, CheckCircle2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Pencil, CheckCircle2, RefreshCw, AlertTriangle, Trash2 } from 'lucide-react'
+import { Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import Badge from '@/components/shared/Badge'
 import UndoBar from '@/components/shared/UndoBar'
+import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import IngresoForm from '@/components/ingresos/IngresoForm'
 import ConfirmarModal from '@/components/ingresos/ConfirmarModal'
-import { deshacerConfirmarIngreso, acreditarIngreso } from '@/app/(dashboard)/ingresos/actions'
+import { deshacerConfirmarIngreso, acreditarIngreso, eliminarIngreso } from '@/app/(dashboard)/ingresos/actions'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
@@ -69,6 +71,12 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
   const [acreditarError, setAcreditarError] = useState<string | null>(null)
   const [acreditarPending, startAcreditar] = useTransition()
 
+  // Estado para eliminar
+  const [deleteRecurrenteOpen, setDeleteRecurrenteOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [pendingAlcance, setPendingAlcance] = useState<'este_mes' | 'todos_siguientes'>('este_mes')
+  const [isPendingDelete, startDeleteTransition] = useTransition()
+
   const confirmado = ingreso.estado === 'confirmado'
   const monto = Number(ingreso.monto_esperado ?? 0)
   const montoReal = ingreso.monto_real != null ? Number(ingreso.monto_real) : null
@@ -76,6 +84,39 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
   const estadoInfo = ESTADO_LABEL[ingreso.estado] ?? ESTADO_LABEL.esperado
 
   const necesitaAcreditar = confirmado && !ingreso.cuenta_destino_id
+
+  // Cálculo de advertencia de saldo negativo al eliminar
+  const cuentaDestino = cuentas.find((c) => c.id === ingreso.cuenta_destino_id) ?? null
+  const montoParaRevertir = Number(ingreso.monto_real ?? ingreso.monto_esperado ?? 0)
+  const saldoPostDelete =
+    confirmado && cuentaDestino
+      ? Number(cuentaDestino.saldo_actual ?? 0) - montoParaRevertir
+      : null
+  const alertaSaldoNegativo = saldoPostDelete !== null && saldoPostDelete < 0
+
+  const descripcionEliminar = (() => {
+    const base = `¿Eliminar "${ingreso.nombre}" por ${formatMXN(montoParaRevertir > 0 ? montoParaRevertir : monto)}? Esta acción no se puede deshacer.`
+    if (alertaSaldoNegativo && cuentaDestino) {
+      return `Eliminar este ingreso descontará ${formatMXN(montoParaRevertir)} de ${cuentaDestino.nombre}, dejándola con saldo negativo de ${formatMXN(Math.abs(saldoPostDelete!))}. ¿Continuar de todas formas?`
+    }
+    return base
+  })()
+
+  const handleDeleteClick = () => {
+    if (ingreso.es_recurrente) {
+      setDeleteRecurrenteOpen(true)
+    } else {
+      setPendingAlcance('este_mes')
+      setConfirmDeleteOpen(true)
+    }
+  }
+
+  const handleDeleteConfirm = () => {
+    startDeleteTransition(async () => {
+      await eliminarIngreso(ingreso.id, pendingAlcance)
+      setConfirmDeleteOpen(false)
+    })
+  }
 
   const handleConfirmarSuccess = (data: {
     transaccionId: string
@@ -176,15 +217,23 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
             )}
           </div>
 
-          {/* Edit button */}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setEditOpen(true)}
-            className="shrink-0"
-          >
-            <Pencil className="size-3.5" />
-          </Button>
+          {/* Edit + Delete buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleDeleteClick}
+            >
+              <Trash2 className="size-3.5 text-destructive" />
+            </Button>
+          </div>
         </div>
 
         {/* Estado / confirmado */}
@@ -290,6 +339,69 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
           onSuccess={handleConfirmarSuccess}
         />
       )}
+
+      {/* Eliminar recurrente — dos opciones */}
+      <Dialog.Root open={deleteRecurrenteOpen} onOpenChange={setDeleteRecurrenteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background p-5 shadow-xl data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-200 focus:outline-none"
+            aria-describedby={undefined}
+          >
+            <Dialog.Title className="text-base font-semibold mb-1">
+              Eliminar ingreso recurrente
+            </Dialog.Title>
+            <p className="text-sm text-muted-foreground mb-4">
+              ¿Qué quieres eliminar de <span className="font-medium text-foreground">{ingreso.nombre}</span>?
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left h-auto py-3 px-4"
+                onClick={() => {
+                  setDeleteRecurrenteOpen(false)
+                  setPendingAlcance('este_mes')
+                  setConfirmDeleteOpen(true)
+                }}
+              >
+                <div>
+                  <p className="font-medium text-sm">Solo este registro</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Elimina únicamente esta instancia</p>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start text-left h-auto py-3 px-4 border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  setDeleteRecurrenteOpen(false)
+                  setPendingAlcance('todos_siguientes')
+                  setConfirmDeleteOpen(true)
+                }}
+              >
+                <div>
+                  <p className="font-medium text-sm">Este y todos los siguientes</p>
+                  <p className="text-xs opacity-75 mt-0.5">Elimina esta instancia y cierra la serie</p>
+                </div>
+              </Button>
+            </div>
+            <Dialog.Close asChild>
+              <Button variant="ghost" className="w-full mt-2">Cancelar</Button>
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Confirmar eliminación */}
+      <ConfirmarAccionModal
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        titulo="Eliminar ingreso"
+        descripcion={descripcionEliminar}
+        labelConfirmar="Eliminar"
+        variante="destructive"
+        onConfirm={handleDeleteConfirm}
+        loading={isPendingDelete}
+      />
     </>
   )
 }
