@@ -89,3 +89,32 @@ export async function actualizarTarjeta(
   revalidatePath('/compromisos')
   return {}
 }
+
+export async function eliminarTarjeta(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // Desactivar compromisos asociados a esta tarjeta
+  await supabase
+    .from('compromisos')
+    .update({ activo: false })
+    .eq('tarjeta_id', id)
+    .eq('usuario_id', user.id)
+
+  // Soft-delete de la tarjeta
+  const { error } = await supabase
+    .from('tarjetas')
+    .update({ activa: false })
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/tarjetas')
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}

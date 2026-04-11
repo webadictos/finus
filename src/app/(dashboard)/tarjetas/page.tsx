@@ -4,6 +4,7 @@ import { CreditCard, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import NuevaTarjetaButton from '@/components/tarjetas/NuevaTarjetaButton'
 import EditarTarjetaButton from '@/components/tarjetas/EditarTarjetaButton'
+import EliminarTarjetaButton from '@/components/tarjetas/EliminarTarjetaButton'
 import Badge from '@/components/shared/Badge'
 import type { Database } from '@/types/database'
 
@@ -12,14 +13,30 @@ type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 export default async function TarjetasPage() {
   const supabase = await createClient()
 
-  const { data } = await supabase
-    .from('tarjetas')
-    .select('*')
-    .eq('activa', true)
-    .order('banco', { ascending: true })
-    .order('nombre', { ascending: true })
+  const [tarjetasRes, compromisosRes] = await Promise.all([
+    supabase
+      .from('tarjetas')
+      .select('*')
+      .eq('activa', true)
+      .order('banco', { ascending: true })
+      .order('nombre', { ascending: true }),
+    supabase
+      .from('compromisos')
+      .select('tarjeta_id')
+      .eq('activo', true)
+      .not('tarjeta_id', 'is', null),
+  ])
 
-  const tarjetas: Tarjeta[] = data ?? []
+  const tarjetas: Tarjeta[] = tarjetasRes.data ?? []
+
+  // Contar compromisos activos por tarjeta
+  const compromisosPorTarjeta = (compromisosRes.data ?? []).reduce<Record<string, number>>(
+    (acc, c) => {
+      if (c.tarjeta_id) acc[c.tarjeta_id] = (acc[c.tarjeta_id] ?? 0) + 1
+      return acc
+    },
+    {}
+  )
 
   const credito = tarjetas.filter((t) => t.tipo === 'credito')
   const departamental = tarjetas.filter((t) => t.tipo === 'departamental')
@@ -80,7 +97,13 @@ export default async function TarjetasPage() {
                     <Badge variant="default">{t.titular_tipo}</Badge>
                   </div>
                 </div>
-                <EditarTarjetaButton tarjeta={t} />
+                <div className="flex items-center gap-1 shrink-0">
+                  <EditarTarjetaButton tarjeta={t} />
+                  <EliminarTarjetaButton
+                    tarjeta={t}
+                    compromisosActivos={compromisosPorTarjeta[t.id] ?? 0}
+                  />
+                </div>
               </div>
 
               {/* Datos */}

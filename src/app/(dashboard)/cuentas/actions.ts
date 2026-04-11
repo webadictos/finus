@@ -137,3 +137,35 @@ export async function actualizarCuenta(
   revalidatePath('/')
   return {}
 }
+
+export async function eliminarCuenta(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // Validar que el saldo sea cero antes de eliminar
+  const { data: cuenta } = await supabase
+    .from('cuentas')
+    .select('saldo_actual')
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (!cuenta) return { error: 'Cuenta no encontrada' }
+  if (Number(cuenta.saldo_actual ?? 0) !== 0)
+    return { error: 'No puedes eliminar una cuenta con saldo. Transfiere el saldo primero.' }
+
+  const { error } = await supabase
+    .from('cuentas')
+    .update({ activa: false })
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/cuentas')
+  revalidatePath('/')
+  return {}
+}
