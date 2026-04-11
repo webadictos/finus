@@ -78,17 +78,24 @@ interface Props {
   onOpenChange: (open: boolean) => void
   compromiso?: Compromiso | null
   tarjetas: Tarjeta[]
+  /** Si se pasa, el selector de tarjeta queda fijo con este id y no es editable */
+  tarjetaIdFijo?: string
 }
 
-export default function CompromisoForm({ open, onOpenChange, compromiso, tarjetas }: Props) {
-  const [form, setForm] = useState<FormState>(() => initialForm(compromiso))
+export default function CompromisoForm({ open, onOpenChange, compromiso, tarjetas, tarjetaIdFijo }: Props) {
+  const [form, setForm] = useState<FormState>(() => {
+    const base = initialForm(compromiso)
+    if (tarjetaIdFijo && !compromiso) base.tarjeta_id = tarjetaIdFijo
+    return base
+  })
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  // Reset form when compromiso changes or sheet opens
   const handleOpenChange = (next: boolean) => {
-    if (next) {
-      setForm(initialForm(compromiso))
+    if (!next) {
+      const base = initialForm(compromiso)
+      if (tarjetaIdFijo && !compromiso) base.tarjeta_id = tarjetaIdFijo
+      setForm(base)
       setError(null)
     }
     onOpenChange(next)
@@ -114,6 +121,10 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
       if (result.error) {
         setError(result.error)
       } else {
+        const base = initialForm(compromiso)
+        if (tarjetaIdFijo && !compromiso) base.tarjeta_id = tarjetaIdFijo
+        setForm(base)
+        setError(null)
         onOpenChange(false)
       }
     })
@@ -303,7 +314,14 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
               </div>
 
               {/* Tarjeta asociada */}
-              {tarjetas.length > 0 && (
+              {tarjetaIdFijo ? (
+                <div className="flex flex-col gap-1.5">
+                  <Label>Tarjeta</Label>
+                  <p className="h-9 flex items-center rounded-md border border-input bg-muted/50 px-3 text-sm text-muted-foreground">
+                    {tarjetas.find((t) => t.id === tarjetaIdFijo)?.nombre ?? tarjetaIdFijo}
+                  </p>
+                </div>
+              ) : tarjetas.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="tarjeta_id">Tarjeta asociada (opcional)</Label>
                   <select
@@ -320,7 +338,7 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                     ))}
                   </select>
                 </div>
-              )}
+              ) : null}
 
               {/* Error */}
               {error && (

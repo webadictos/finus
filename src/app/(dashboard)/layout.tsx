@@ -8,12 +8,14 @@ import {
   Wallet,
   BarChart3,
   Target,
+  WalletCards,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
+  { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
   { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
   { href: '/gastos', label: 'Gastos', icon: Wallet },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },

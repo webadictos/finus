@@ -3,14 +3,17 @@ import { formatMXN } from '@/lib/format'
 import { CreditCard } from 'lucide-react'
 import CompromisoCard from '@/components/compromisos/CompromisoCard'
 import NuevoCompromisoButton from '@/components/compromisos/NuevoCompromisoButton'
+import AgregarCompromisoTarjetaButton from '@/components/compromisos/AgregarCompromisoTarjetaButton'
+import EditarTarjetaButton from '@/components/tarjetas/EditarTarjetaButton'
+import Badge from '@/components/shared/Badge'
 import type { Database } from '@/types/database'
 
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
+type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 
 export default async function CompromisosPage() {
   const supabase = await createClient()
 
-  // Primer día del mes actual para detectar pagos de este mes
   const hoy = new Date()
   const startOfMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
 
@@ -21,7 +24,7 @@ export default async function CompromisosPage() {
       .select('*')
       .eq('activo', true)
       .order('fecha_proximo_pago', { ascending: true, nullsFirst: false }),
-    supabase.from('tarjetas').select('*').eq('activa', true),
+    supabase.from('tarjetas').select('*').eq('activa', true).order('banco', { ascending: true }).order('nombre', { ascending: true }),
     supabase
       .from('transacciones')
       .select('compromiso_id, monto')
@@ -31,13 +34,11 @@ export default async function CompromisosPage() {
   ])
 
   const compromisos: Compromiso[] = compromisosRes.data ?? []
-  const tarjetas = tarjetasRes.data ?? []
+  const tarjetas: Tarjeta[] = tarjetasRes.data ?? []
   const cuentas = cuentasRes.data ?? []
 
-  // Saldo disponible (cuentas líquidas activas)
   const saldoDisponible = cuentas.reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0)
 
-  // Mapa de pagos este mes: compromiso_id → monto total pagado
   const pagosEsteMes: Record<string, number> = {}
   for (const p of pagosRes.data ?? []) {
     if (p.compromiso_id) {
@@ -46,13 +47,24 @@ export default async function CompromisosPage() {
     }
   }
 
-  // KPIs del resumen
   const totalPorPagar = compromisos.reduce(
     (sum, c) => sum + Number(c.monto_mensualidad ?? 0),
     0
   )
-  const totalActivos = compromisos.length
   const totalPagadosEsteMes = Object.keys(pagosEsteMes).length
+
+  // ── Grupos: todas las tarjetas activas (aunque estén vacías) + Sin tarjeta ──
+  type Grupo = { tarjeta: Tarjeta | null; compromisos: Compromiso[] }
+
+  const grupos: Grupo[] = tarjetas.map((t) => ({
+    tarjeta: t,
+    compromisos: compromisos.filter((c) => c.tarjeta_id === t.id),
+  }))
+
+  const sinTarjeta = compromisos.filter((c) => !c.tarjeta_id)
+  grupos.push({ tarjeta: null, compromisos: sinTarjeta })
+
+  const hayAlgo = compromisos.length > 0 || tarjetas.length > 0
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto">
@@ -64,7 +76,6 @@ export default async function CompromisosPage() {
             Pagos recurrentes y deudas activas
           </p>
         </div>
-        <NuevoCompromisoButton tarjetas={tarjetas} />
       </div>
 
       {/* Resumen */}
@@ -78,7 +89,7 @@ export default async function CompromisosPage() {
         </div>
         <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">Activos</p>
-          <p className="text-lg font-bold tabular-nums">{totalActivos}</p>
+          <p className="text-lg font-bold tabular-nums">{compromisos.length}</p>
           <p className="text-xs text-muted-foreground">compromisos</p>
         </div>
         <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
@@ -90,27 +101,115 @@ export default async function CompromisosPage() {
         </div>
       </div>
 
-      {/* Lista */}
-      {compromisos.length === 0 ? (
+      {/* Lista agrupada */}
+      {!hayAlgo ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-12 text-center">
           <CreditCard className="size-8 text-muted-foreground" />
           <p className="text-sm font-medium">Sin compromisos registrados</p>
           <p className="text-xs text-muted-foreground">
             Agrega tus deudas y pagos recurrentes para ver recomendaciones
           </p>
+          <NuevoCompromisoButton tarjetas={tarjetas} />
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {compromisos.map((c) => (
-            <CompromisoCard
-              key={c.id}
-              compromiso={c}
-              saldoDisponible={saldoDisponible}
-              tarjetas={tarjetas}
-              cuentas={cuentas}
-              pagadoEsteMes={pagosEsteMes[c.id] ?? null}
-            />
-          ))}
+        <div className="flex flex-col gap-8">
+          {grupos.map(({ tarjeta, compromisos: lista }) => {
+            // Omitir el grupo "Sin tarjeta" si está vacío y hay tarjetas
+            if (!tarjeta && lista.length === 0) return null
+
+            const totalEstimado = lista.reduce(
+              (s, c) => s + Number(c.monto_mensualidad ?? 0),
+              0
+            )
+            const psi =
+              tarjeta?.pago_sin_intereses != null
+                ? Number(tarjeta.pago_sin_intereses)
+                : null
+            const pmin =
+              tarjeta?.pago_minimo != null ? Number(tarjeta.pago_minimo) : null
+            const tieneEdoCuenta = psi != null && pmin != null
+
+            return (
+              <div key={tarjeta?.id ?? 'sin-tarjeta'} className="flex flex-col gap-3">
+                {/* Encabezado del grupo */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CreditCard className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm font-semibold truncate">
+                      {tarjeta ? `${tarjeta.banco} · ${tarjeta.nombre}` : 'Sin tarjeta'}
+                    </span>
+                    {tarjeta && (
+                      <Badge
+                        variant={tarjeta.tipo === 'departamental' ? 'orange' : 'info'}
+                      >
+                        {tarjeta.tipo === 'departamental' ? 'Departamental' : 'Crédito'}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {lista.length > 0 && (
+                      <span className="text-sm tabular-nums text-muted-foreground">
+                        Est.{' '}
+                        <span className="font-medium text-foreground">
+                          {formatMXN(totalEstimado)}
+                        </span>
+                      </span>
+                    )}
+                    {tarjeta && <EditarTarjetaButton tarjeta={tarjeta} />}
+                  </div>
+                </div>
+
+                {/* Estado de cuenta real */}
+                {tieneEdoCuenta && (
+                  <div className="flex items-center gap-4 rounded-lg bg-muted/50 border px-3 py-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">
+                      Estado de cuenta real
+                    </span>
+                    <span>
+                      PSI{' '}
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatMXN(psi!)}
+                      </span>
+                    </span>
+                    <span>
+                      Mín{' '}
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatMXN(pmin!)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Cards o estado vacío */}
+                {lista.length === 0 ? (
+                  <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                    Sin compromisos aún
+                  </p>
+                ) : (
+                  lista.map((c) => (
+                    <CompromisoCard
+                      key={c.id}
+                      compromiso={c}
+                      saldoDisponible={saldoDisponible}
+                      tarjetas={tarjetas}
+                      cuentas={cuentas}
+                      pagadoEsteMes={pagosEsteMes[c.id] ?? null}
+                    />
+                  ))
+                )}
+
+                {/* Acción al pie */}
+                {tarjeta ? (
+                  <AgregarCompromisoTarjetaButton
+                    tarjetaId={tarjeta.id}
+                    tarjetas={tarjetas}
+                  />
+                ) : (
+                  <NuevoCompromisoButton tarjetas={tarjetas} />
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

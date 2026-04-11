@@ -80,7 +80,7 @@ export default function IngresoForm({ open, onOpenChange, ingreso, cuentas }: Pr
   const [isPending, startTransition] = useTransition()
 
   const handleOpenChange = (next: boolean) => {
-    if (next) {
+    if (!next) {
       setForm(initialForm(ingreso))
       setError(null)
     }
@@ -114,6 +114,8 @@ export default function IngresoForm({ open, onOpenChange, ingreso, cuentas }: Pr
       if (result.error) {
         setError(result.error)
       } else {
+        setForm(initialForm(ingreso))
+        setError(null)
         onOpenChange(false)
       }
     })

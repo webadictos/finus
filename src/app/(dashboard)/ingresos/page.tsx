@@ -10,9 +10,6 @@ type Ingreso = Database['public']['Tables']['ingresos']['Row']
 export default async function IngresosPage() {
   const supabase = await createClient()
 
-  const hoy = new Date()
-  const startOfMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
-
   const [{ data }, cuentasRes] = await Promise.all([
     supabase
       .from('ingresos')
@@ -34,8 +31,7 @@ export default async function IngresosPage() {
   const pendientes = ingresos.filter((i) => i.estado !== 'confirmado')
 
   // KPIs
-  const totalConfirmadoMes = confirmados
-    .filter((i) => i.fecha_real && i.fecha_real >= startOfMonth)
+  const totalConfirmado = confirmados
     .reduce((sum, i) => sum + Number(i.monto_real ?? i.monto_esperado ?? 0), 0)
 
   const totalPendiente = pendientes
@@ -61,10 +57,10 @@ export default async function IngresosPage() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
           <p className="text-xs text-muted-foreground uppercase tracking-wide">
-            Confirmado este mes
+            Total confirmado
           </p>
           <p className="text-lg font-bold text-emerald-600 tabular-nums">
-            {formatMXN(totalConfirmadoMes)}
+            {formatMXN(totalConfirmado)}
           </p>
           <p className="text-xs text-muted-foreground">{confirmados.length} ingresos</p>
         </div>

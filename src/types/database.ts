@@ -93,6 +93,7 @@ export interface Database {
           id: string
           usuario_id: string
           nombre: string
+          banco: string
           tipo: 'credito' | 'departamental'
           titular_tipo: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
           limite_credito: number
@@ -111,6 +112,7 @@ export interface Database {
           id?: string
           usuario_id: string
           nombre: string
+          banco: string
           tipo: 'credito' | 'departamental'
           titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
           limite_credito?: number
@@ -129,6 +131,7 @@ export interface Database {
           id?: string
           usuario_id?: string
           nombre?: string
+          banco?: string
           tipo?: 'credito' | 'departamental'
           titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
           limite_credito?: number
@@ -378,6 +381,7 @@ export interface Database {
           cuenta_id: string | null
           tarjeta_id: string | null
           compromiso_id: string | null
+          proyecto_proveedor_id: string | null
           forma_pago: string | null
           meses_msi: number | null
           es_recurrente: boolean
@@ -395,6 +399,7 @@ export interface Database {
           cuenta_id?: string | null
           tarjeta_id?: string | null
           compromiso_id?: string | null
+          proyecto_proveedor_id?: string | null
           forma_pago?: string | null
           meses_msi?: number | null
           es_recurrente?: boolean
@@ -412,10 +417,114 @@ export interface Database {
           cuenta_id?: string | null
           tarjeta_id?: string | null
           compromiso_id?: string | null
+          proyecto_proveedor_id?: string | null
           forma_pago?: string | null
           meses_msi?: number | null
           es_recurrente?: boolean
           notas?: string | null
+        }
+        Relationships: Rel[]
+      }
+      proyectos: {
+        Row: {
+          id: string
+          usuario_id: string
+          nombre: string
+          descripcion: string | null
+          fecha_evento: string | null
+          total_comprometido: number
+          total_abonado: number
+          total_pendiente: number
+          techo_gasto: number | null
+          estado: 'planeando' | 'en_curso' | 'completado' | 'cancelado'
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          nombre: string
+          descripcion?: string | null
+          fecha_evento?: string | null
+          total_comprometido?: number
+          total_abonado?: number
+          total_pendiente?: number
+          techo_gasto?: number | null
+          estado?: 'planeando' | 'en_curso' | 'completado' | 'cancelado'
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          nombre?: string
+          descripcion?: string | null
+          fecha_evento?: string | null
+          total_comprometido?: number
+          total_abonado?: number
+          total_pendiente?: number
+          techo_gasto?: number | null
+          estado?: 'planeando' | 'en_curso' | 'completado' | 'cancelado'
+          activo?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
+      proyecto_proveedores: {
+        Row: {
+          id: string
+          proyecto_id: string
+          usuario_id: string
+          nombre: string
+          categoria: string | null
+          monto_total: number
+          anticipo_requerido: number | null
+          fecha_anticipo: string | null
+          fecha_limite_liquidacion: string
+          monto_abonado: number
+          monto_pendiente: number
+          estado: 'sin_anticipo' | 'anticipo_pagado' | 'abonando' | 'liquidado' | 'cancelado'
+          notas: string | null
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          proyecto_id: string
+          usuario_id: string
+          nombre: string
+          categoria?: string | null
+          monto_total: number
+          anticipo_requerido?: number | null
+          fecha_anticipo?: string | null
+          fecha_limite_liquidacion: string
+          monto_abonado?: number
+          monto_pendiente?: number
+          estado?: 'sin_anticipo' | 'anticipo_pagado' | 'abonando' | 'liquidado' | 'cancelado'
+          notas?: string | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          proyecto_id?: string
+          usuario_id?: string
+          nombre?: string
+          categoria?: string | null
+          monto_total?: number
+          anticipo_requerido?: number | null
+          fecha_anticipo?: string | null
+          fecha_limite_liquidacion?: string
+          monto_abonado?: number
+          monto_pendiente?: number
+          estado?: 'sin_anticipo' | 'anticipo_pagado' | 'abonando' | 'liquidado' | 'cancelado'
+          notas?: string | null
+          activo?: boolean
+          updated_at?: string
         }
         Relationships: Rel[]
       }
@@ -468,6 +577,10 @@ export interface Database {
       }
       decrementar_saldo: {
         Args: { p_cuenta_id: string; p_monto: number }
+        Returns: void
+      }
+      recalcular_proyecto: {
+        Args: { p_proyecto_id: string }
         Returns: void
       }
     }
