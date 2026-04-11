@@ -126,12 +126,11 @@ export async function confirmarIngreso(
   // 2. Crear transacción de ingreso
   const { error: txErr } = await supabase.from('transacciones').insert({
     usuario_id: user.id,
-    ingreso_id: id,
-    cuenta_id: ingreso.cuenta_destino_id,
-    monto: montoReal,
     tipo: 'ingreso' as const,
-    descripcion: `Ingreso: ${ingreso.nombre}`,
+    monto: montoReal,
     fecha: fechaReal,
+    descripcion: ingreso.nombre,
+    cuenta_id: ingreso.cuenta_destino_id,
   })
 
   if (txErr) return { error: txErr.message }

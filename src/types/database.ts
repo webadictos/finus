@@ -349,40 +349,52 @@ export interface Database {
         Row: {
           id: string
           usuario_id: string
+          tipo: 'ingreso' | 'gasto' | 'transferencia'
+          monto: number
+          fecha: string
+          descripcion: string | null
+          categoria: string | null
           cuenta_id: string | null
           tarjeta_id: string | null
-          ingreso_id: string | null
           compromiso_id: string | null
-          monto: number
-          tipo: 'ingreso' | 'gasto' | 'transferencia'
-          descripcion: string | null
-          fecha: string
+          forma_pago: string | null
+          meses_msi: number | null
+          es_recurrente: boolean
+          notas: string | null
           created_at: string
         }
         Insert: {
           id?: string
           usuario_id: string
+          tipo: 'ingreso' | 'gasto' | 'transferencia'
+          monto: number
+          fecha: string
+          descripcion?: string | null
+          categoria?: string | null
           cuenta_id?: string | null
           tarjeta_id?: string | null
-          ingreso_id?: string | null
           compromiso_id?: string | null
-          monto: number
-          tipo: 'ingreso' | 'gasto' | 'transferencia'
-          descripcion?: string | null
-          fecha: string
+          forma_pago?: string | null
+          meses_msi?: number | null
+          es_recurrente?: boolean
+          notas?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           usuario_id?: string
+          tipo?: 'ingreso' | 'gasto' | 'transferencia'
+          monto?: number
+          fecha?: string
+          descripcion?: string | null
+          categoria?: string | null
           cuenta_id?: string | null
           tarjeta_id?: string | null
-          ingreso_id?: string | null
           compromiso_id?: string | null
-          monto?: number
-          tipo?: 'ingreso' | 'gasto' | 'transferencia'
-          descripcion?: string | null
-          fecha?: string
+          forma_pago?: string | null
+          meses_msi?: number | null
+          es_recurrente?: boolean
+          notas?: string | null
         }
         Relationships: Rel[]
       }
