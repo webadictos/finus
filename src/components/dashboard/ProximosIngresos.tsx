@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import { TrendingUp } from 'lucide-react'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
   pendiente: {
@@ -22,9 +23,10 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
 
 interface Props {
   ingresos: Ingreso[]
+  cuentas: Cuenta[]
 }
 
-export default function ProximosIngresos({ ingresos }: Props) {
+export default function ProximosIngresos({ ingresos, cuentas }: Props) {
   // Solo ingresos no confirmados con fecha próxima, o fijos recurrentes sin fecha
   const proximos = ingresos
     .filter((i) => i.estado !== 'confirmado')
@@ -90,7 +92,7 @@ export default function ProximosIngresos({ ingresos }: Props) {
                   {formatMXN(Number(ingreso.monto_esperado ?? 0))}
                 </span>
                 {ingreso.estado !== 'confirmado' && (
-                  <ConfirmarIngresoButton ingresoId={ingreso.id} />
+                  <ConfirmarIngresoButton ingreso={ingreso} cuentas={cuentas} />
                 )}
               </div>
             </div>

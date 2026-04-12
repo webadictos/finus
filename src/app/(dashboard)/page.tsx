@@ -83,7 +83,7 @@ async function DashboardData() {
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AlertasVencimiento compromisos={compromisos} saldoDisponible={saldoDisponible} />
-        <ProximosIngresos ingresos={ingresos} />
+        <ProximosIngresos ingresos={ingresos} cuentas={cuentas} />
         <ProximosGastosPrevistos gastos={gastosPrevistos} />
       </div>
     </>

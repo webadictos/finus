@@ -102,10 +102,18 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
         ? 'Este y todos los registros futuros de esta serie serán eliminados.'
         : 'Esta acción no se puede deshacer.'
 
+    // Aviso de trazabilidad: si el ingreso fue confirmado y acreditado a una cuenta,
+    // el saldo se revertirá, pero si el usuario sincronizó manualmente el saldo después,
+    // el resultado puede no ser correcto.
+    const avisoSync =
+      confirmado && ingreso.cuenta_destino_id
+        ? ' ⚠️ Si sincronizaste el saldo de la cuenta manualmente después de confirmar este ingreso, deberás volver a sincronizarlo.'
+        : ''
+
     if (alertaSaldoNegativo && cuentaDestino) {
-      return `Eliminar este ingreso descontará ${formatMXN(montoParaRevertir)} de ${cuentaDestino.nombre}, dejándola con saldo negativo de ${formatMXN(Math.abs(saldoPostDelete!))}. ${sufijo} ¿Continuar de todas formas?`
+      return `Eliminar este ingreso descontará ${formatMXN(montoParaRevertir)} de ${cuentaDestino.nombre}, dejándola con saldo negativo de ${formatMXN(Math.abs(saldoPostDelete!))}. ${sufijo}${avisoSync} ¿Continuar de todas formas?`
     }
-    return `¿Eliminar "${ingreso.nombre}" por ${montoDisplay}? ${sufijo}`
+    return `¿Eliminar "${ingreso.nombre}" por ${montoDisplay}? ${sufijo}${avisoSync}`
   })()
 
   // El flujo de eliminación es independiente del estado — solo depende de es_recurrente
