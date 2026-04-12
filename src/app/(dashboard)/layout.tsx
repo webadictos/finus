@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { LogoutButton } from '@/components/dashboard/LogoutButton'
 import MobileNav from '@/components/dashboard/MobileNav'
 import {
   LayoutDashboard,
@@ -11,6 +10,7 @@ import {
   Target,
   WalletCards,
   Landmark,
+  Settings,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -75,15 +75,21 @@ export default async function DashboardLayout({
           ))}
         </nav>
 
-        {/* User + logout */}
+        {/* User + configuración */}
         <div className="border-t p-3">
           <div className="rounded-md px-3 py-2">
             <p className="text-sm font-medium truncate">{nombre}</p>
             <p className="text-xs text-muted-foreground truncate">{email}</p>
           </div>
-          <div className="px-3 py-1">
-            <LogoutButton />
-          </div>
+          <Link
+            href="/configuracion"
+            className={cn(
+              'flex items-center gap-2.5 rounded-md px-3 py-2 text-[15px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+            )}
+          >
+            <Settings className="size-4 shrink-0" />
+            Configuración
+          </Link>
         </div>
       </aside>
 
@@ -92,7 +98,9 @@ export default async function DashboardLayout({
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between border-b bg-card px-4 py-3">
           <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
-          <LogoutButton />
+          <Link href="/configuracion" className="p-1 text-muted-foreground hover:text-foreground">
+            <Settings className="size-5" />
+          </Link>
         </header>
 
         {/* pb-16 leaves space for the fixed mobile bottom nav */}

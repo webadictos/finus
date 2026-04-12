@@ -15,6 +15,7 @@ import {
   WalletCards,
   BarChart3,
   Target,
+  Settings,
   X,
 } from 'lucide-react'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
@@ -35,6 +36,7 @@ const MAS_ITEMS = [
   { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
   { href: '/metas', label: 'Metas', icon: Target },
+  { href: '/configuracion', label: 'Config.', icon: Settings },
 ]
 
 export default function MobileNav({ cuentas, tarjetas }: Props) {

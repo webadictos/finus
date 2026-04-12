@@ -273,6 +273,37 @@ function recomendarRevolvente(
   }
 }
 
+function recomendarSuscripcion(
+  compromiso: CompromisoParaRecomendacion,
+  saldo: number
+): Recomendacion {
+  const monto = Number(compromiso.monto_mensualidad ?? 0)
+
+  if (saldo >= monto) {
+    return {
+      accion: 'Pago automático — verifica saldo suficiente',
+      detalle: `El cobro de ${formatMXN(monto)} se realizará automáticamente. Asegúrate de tener saldo en la cuenta o tarjeta vinculada.`,
+      color: 'verde',
+      monto_sugerido: monto,
+      monto_minimo: monto,
+      interes_estimado_mensual: null,
+      fecha_ingreso_proximo: null,
+      nombre_ingreso_proximo: null,
+    }
+  }
+
+  return {
+    accion: 'Saldo insuficiente — el cobro automático podría fallar',
+    detalle: `Necesitas ${formatMXN(monto)} disponibles para el cargo automático de ${compromiso.nombre}.`,
+    color: 'rojo_fuerte',
+    monto_sugerido: monto,
+    monto_minimo: monto,
+    interes_estimado_mensual: null,
+    fecha_ingreso_proximo: null,
+    nombre_ingreso_proximo: null,
+  }
+}
+
 function recomendarDisposicion(
   compromiso: CompromisoParaRecomendacion,
   saldo: number
@@ -354,7 +385,7 @@ export function getRecomendacion(
       return recomendarDisposicion(compromiso, saldoDisponible)
 
     case 'suscripcion':
-      return recomendarFijo(compromiso, saldoDisponible)
+      return recomendarSuscripcion(compromiso, saldoDisponible)
 
     default: {
       const _exhaustive: never = compromiso.tipo_pago

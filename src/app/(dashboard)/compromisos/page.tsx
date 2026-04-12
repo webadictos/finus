@@ -17,7 +17,7 @@ export default async function CompromisosPage() {
   const hoy = new Date()
   const startOfMonth = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`
 
-  const [cuentasRes, compromisosRes, tarjetasRes, pagosRes, ingresosRes] = await Promise.all([
+  const [cuentasRes, compromisosRes, tarjetasRes, pagosRes, ingresosRes, acuerdosRes] = await Promise.all([
     supabase.from('cuentas').select('*').eq('activa', true).neq('tipo', 'inversion').order('nombre', { ascending: true }),
     supabase
       .from('compromisos')
@@ -36,11 +36,23 @@ export default async function CompromisosPage() {
       .select('estado, cuenta_destino_id, monto_real, monto_esperado')
       .eq('estado', 'confirmado')
       .is('cuenta_destino_id', null),
+    supabase
+      .from('acuerdos_pago')
+      .select('*')
+      .eq('activo', true)
+      .eq('estado', 'activo'),
   ])
 
   const compromisos: Compromiso[] = compromisosRes.data ?? []
   const tarjetas: Tarjeta[] = tarjetasRes.data ?? []
   const cuentas = cuentasRes.data ?? []
+  const acuerdos = acuerdosRes.data ?? []
+
+  // Índice acuerdo por compromiso_id para lookup O(1)
+  const acuerdoPorCompromiso: Record<string, typeof acuerdos[number]> = {}
+  for (const a of acuerdos) {
+    acuerdoPorCompromiso[a.compromiso_id] = a
+  }
 
   const ingresosSinCuenta = (ingresosRes.data ?? []).reduce(
     (sum, i) => sum + Number(i.monto_real ?? i.monto_esperado ?? 0),
@@ -207,6 +219,7 @@ export default async function CompromisosPage() {
                       tarjetas={tarjetas}
                       cuentas={cuentas}
                       pagadoEsteMes={pagosEsteMes[c.id] ?? null}
+                      acuerdo={acuerdoPorCompromiso[c.id] ?? null}
                     />
                   ))
                 )}

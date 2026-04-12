@@ -1,0 +1,230 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { Dialog } from 'radix-ui'
+import { LogOut, AlertTriangle, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { actualizarPerfil, resetearDatos } from '@/app/(dashboard)/configuracion/actions'
+import { logoutAction } from '@/app/(auth)/actions'
+
+interface Props {
+  nombre: string | null
+  email: string
+}
+
+export default function ConfiguracionClient({ nombre, email }: Props) {
+  // ── Perfil ──────────────────────────────────────────────────────────────────
+  const [nombreValue, setNombreValue] = useState(nombre ?? '')
+  const [perfilMsg, setPerfilMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
+  const [perfilPending, startPerfilTransition] = useTransition()
+
+  const handleGuardarPerfil = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setPerfilMsg(null)
+    const formData = new FormData(e.currentTarget)
+    startPerfilTransition(async () => {
+      const result = await actualizarPerfil(formData)
+      if (result.error) {
+        setPerfilMsg({ tipo: 'error', texto: result.error })
+      } else {
+        setPerfilMsg({ tipo: 'ok', texto: 'Perfil actualizado correctamente.' })
+      }
+    })
+  }
+
+  // ── Reset ───────────────────────────────────────────────────────────────────
+  const [resetOpen, setResetOpen] = useState(false)
+  const [resetInput, setResetInput] = useState('')
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetPending, startResetTransition] = useTransition()
+
+  const handleReset = () => {
+    if (resetInput !== 'RESET') {
+      setResetError('Escribe RESET exactamente para confirmar')
+      return
+    }
+    setResetError(null)
+    startResetTransition(async () => {
+      const result = await resetearDatos()
+      if (result.error) {
+        setResetError(result.error)
+      } else {
+        setResetOpen(false)
+        setResetInput('')
+      }
+    })
+  }
+
+  // ── Logout ──────────────────────────────────────────────────────────────────
+  const [logoutPending, startLogoutTransition] = useTransition()
+
+  return (
+    <div className="flex flex-col gap-8 max-w-lg">
+      {/* ── Perfil ── */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-semibold">Perfil</h2>
+          <p className="text-sm text-muted-foreground">Tu información personal en Finus</p>
+        </div>
+
+        <form onSubmit={handleGuardarPerfil} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="nombre">Nombre</Label>
+            <Input
+              id="nombre"
+              name="nombre"
+              type="text"
+              value={nombreValue}
+              onChange={(e) => setNombreValue(e.target.value)}
+              placeholder="Tu nombre"
+              required
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label>Email</Label>
+            <Input value={email} disabled className="opacity-60 cursor-not-allowed" />
+            <p className="text-xs text-muted-foreground">El email no se puede cambiar desde aquí</p>
+          </div>
+
+          {perfilMsg && (
+            <p
+              className={`rounded-md px-3 py-2 text-sm ${
+                perfilMsg.tipo === 'ok'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-destructive/10 text-destructive'
+              }`}
+            >
+              {perfilMsg.texto}
+            </p>
+          )}
+
+          <Button type="submit" disabled={perfilPending} className="self-start">
+            {perfilPending ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </form>
+      </section>
+
+      <div className="border-t" />
+
+      {/* ── Preferencias ── */}
+      <section className="flex flex-col gap-2">
+        <div>
+          <h2 className="text-base font-semibold">Preferencias</h2>
+          <p className="text-sm text-muted-foreground">Moneda, zona horaria y más</p>
+        </div>
+        <div className="rounded-xl border bg-muted/40 px-4 py-5 text-sm text-muted-foreground text-center">
+          Próximamente
+        </div>
+      </section>
+
+      <div className="border-t" />
+
+      {/* ── Danger Zone ── */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-destructive">Zona de riesgo</h2>
+          <p className="text-sm text-muted-foreground">Acciones irreversibles — procede con cuidado</p>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          {/* Cerrar sesión */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Cerrar sesión</p>
+              <p className="text-xs text-muted-foreground">Salir de tu cuenta en este dispositivo</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={logoutPending}
+              onClick={() =>
+                startLogoutTransition(() => logoutAction())
+              }
+            >
+              <LogOut className="size-3.5 mr-1.5" />
+              {logoutPending ? 'Saliendo…' : 'Salir'}
+            </Button>
+          </div>
+
+          <div className="border-t border-destructive/20" />
+
+          {/* Restablecer datos */}
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium">Restablecer datos</p>
+              <p className="text-xs text-muted-foreground">
+                Desactiva todos tus compromisos, cuentas y tarjetas. No elimina el historial.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => { setResetInput(''); setResetError(null); setResetOpen(true) }}
+            >
+              Restablecer
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Modal RESET ── */}
+      <Dialog.Root open={resetOpen} onOpenChange={setResetOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 duration-200"
+            aria-describedby="reset-desc"
+          >
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <Dialog.Title className="text-base font-semibold flex items-center gap-2 text-destructive">
+                <AlertTriangle className="size-4 shrink-0" />
+                Restablecer todos los datos
+              </Dialog.Title>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" className="-mt-1 shrink-0">
+                  <X className="size-4" />
+                </Button>
+              </Dialog.Close>
+            </div>
+
+            <Dialog.Description id="reset-desc" className="text-sm text-muted-foreground mb-4">
+              Esto desactivará todos tus compromisos, ingresos, cuentas, tarjetas y gastos previstos.
+              Las transacciones históricas se conservan. <span className="font-semibold text-foreground">Esta acción no se puede deshacer.</span>
+            </Dialog.Description>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="reset-confirm">Escribe <span className="font-mono font-bold">RESET</span> para confirmar</Label>
+                <Input
+                  id="reset-confirm"
+                  value={resetInput}
+                  onChange={(e) => setResetInput(e.target.value)}
+                  placeholder="RESET"
+                  autoComplete="off"
+                />
+              </div>
+
+              {resetError && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {resetError}
+                </p>
+              )}
+
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleReset}
+                disabled={resetPending || resetInput !== 'RESET'}
+              >
+                {resetPending ? 'Restableciendo…' : 'Confirmar restablecimiento'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  )
+}

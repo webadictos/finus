@@ -240,6 +240,111 @@ export async function eliminarCompromiso(
   return {}
 }
 
+export async function crearAcuerdoPago(
+  compromisoId: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const monto_acordado = parseFloat(formData.get('monto_acordado') as string)
+  const fecha_acuerdo = (formData.get('fecha_acuerdo') as string) || new Date().toISOString().split('T')[0]
+  const fecha_limite = formData.get('fecha_limite') as string
+  const notas = (formData.get('notas') as string) || null
+
+  if (isNaN(monto_acordado) || monto_acordado <= 0) return { error: 'Monto inválido' }
+  if (!fecha_limite) return { error: 'La fecha límite es requerida' }
+
+  const { error } = await supabase.from('acuerdos_pago').insert({
+    usuario_id: user.id,
+    compromiso_id: compromisoId,
+    monto_acordado,
+    fecha_acuerdo,
+    fecha_limite,
+    monto_abonado: 0,
+    monto_pendiente: monto_acordado,
+    estado: 'activo' as const,
+    notas,
+    activo: true,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
+export type RegistrarAbonoResult = { error?: string }
+
+export async function registrarAbono(
+  acuerdoId: string,
+  compromisoId: string,
+  monto: number,
+  cuentaId: string | null
+): Promise<RegistrarAbonoResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // Obtener nombre del compromiso para la descripción
+  const { data: compromiso } = await supabase
+    .from('compromisos')
+    .select('nombre')
+    .eq('id', compromisoId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  // Insertar transacción ligada al compromiso
+  const { error: txError } = await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    compromiso_id: compromisoId,
+    tipo: 'gasto' as const,
+    monto,
+    fecha: hoy,
+    descripcion: `Abono acuerdo: ${compromiso?.nombre ?? ''}`,
+    cuenta_id: cuentaId,
+  })
+
+  if (txError) return { error: txError.message }
+
+  // Descontar saldo si se especificó cuenta
+  if (cuentaId) {
+    await supabase.rpc('decrementar_saldo', { p_cuenta_id: cuentaId, p_monto: monto })
+  }
+
+  // Actualizar monto_abonado y monto_pendiente en el acuerdo
+  const { data: acuerdo } = await supabase
+    .from('acuerdos_pago')
+    .select('monto_acordado, monto_abonado')
+    .eq('id', acuerdoId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (acuerdo) {
+    const nuevoAbonado = Number(acuerdo.monto_abonado) + monto
+    const nuevoPendiente = Math.max(0, Number(acuerdo.monto_acordado) - nuevoAbonado)
+    const nuevoEstado = nuevoPendiente === 0 ? 'cumplido' : 'activo'
+
+    await supabase
+      .from('acuerdos_pago')
+      .update({
+        monto_abonado: nuevoAbonado,
+        monto_pendiente: nuevoPendiente,
+        estado: nuevoEstado as 'activo' | 'cumplido',
+      })
+      .eq('id', acuerdoId)
+      .eq('usuario_id', user.id)
+  }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
 export async function deshacerMarcarPagado(
   transaccionId: string,
   compromisoId: string,

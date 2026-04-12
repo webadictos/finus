@@ -547,6 +547,53 @@ export interface Database {
         }
         Relationships: Rel[]
       }
+      acuerdos_pago: {
+        Row: {
+          id: string
+          usuario_id: string
+          compromiso_id: string
+          monto_acordado: number
+          fecha_acuerdo: string
+          fecha_limite: string
+          monto_abonado: number
+          monto_pendiente: number
+          estado: 'activo' | 'cumplido' | 'incumplido'
+          notas: string | null
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          compromiso_id: string
+          monto_acordado: number
+          fecha_acuerdo?: string
+          fecha_limite: string
+          monto_abonado?: number
+          monto_pendiente?: number
+          estado?: 'activo' | 'cumplido' | 'incumplido'
+          notas?: string | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          compromiso_id?: string
+          monto_acordado?: number
+          fecha_acuerdo?: string
+          fecha_limite?: string
+          monto_abonado?: number
+          monto_pendiente?: number
+          estado?: 'activo' | 'cumplido' | 'incumplido'
+          notas?: string | null
+          activo?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
       metas: {
         Row: {
           id: string

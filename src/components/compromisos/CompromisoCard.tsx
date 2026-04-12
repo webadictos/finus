@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Pencil, CheckCircle2, Trash2 } from 'lucide-react'
+import { Pencil, CheckCircle2, Trash2, FileText } from 'lucide-react'
 import { Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
@@ -11,6 +11,8 @@ import UndoBar from '@/components/shared/UndoBar'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import CompromisoForm from '@/components/compromisos/CompromisoForm'
 import PagarModal from '@/components/compromisos/PagarModal'
+import AcuerdoPagoForm from '@/components/compromisos/AcuerdoPagoForm'
+import RegistrarAbonoModal from '@/components/compromisos/RegistrarAbonoModal'
 import { deshacerMarcarPagado, eliminarCompromiso } from '@/app/(dashboard)/compromisos/actions'
 import { getRecomendacion } from '@/lib/recommendations'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
@@ -20,6 +22,7 @@ import type { BadgeVariant } from '@/components/shared/Badge'
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
+type AcuerdoPago = Database['public']['Tables']['acuerdos_pago']['Row']
 
 interface Props {
   compromiso: Compromiso
@@ -28,6 +31,8 @@ interface Props {
   cuentas: Cuenta[]
   /** Monto total pagado este mes para este compromiso, null si no se ha pagado */
   pagadoEsteMes: number | null
+  /** Acuerdo de pago activo para este compromiso, si existe */
+  acuerdo?: AcuerdoPago | null
 }
 
 // ─── Helpers de display ───────────────────────────────────────────────────────
@@ -72,15 +77,17 @@ export default function CompromisoCard({
   tarjetas,
   cuentas,
   pagadoEsteMes,
+  acuerdo = null,
 }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [pagarOpen, setPagarOpen] = useState(false)
+  const [acuerdoOpen, setAcuerdoOpen] = useState(false)
+  const [abonoOpen, setAbonoOpen] = useState(false)
   const [undoData, setUndoData] = useState<UndoData | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteSimpleOpen, setDeleteSimpleOpen] = useState(false)
   const [deleteLoading, startDeleteTransition] = useTransition()
 
-  // Un compromiso es recurrente si es revolvente/fijo (indefinido) o tiene >1 mensualidad restante
   const esRecurrente =
     compromiso.tipo_pago === 'revolvente' ||
     compromiso.tipo_pago === 'fijo' ||
@@ -129,6 +136,8 @@ export default function CompromisoCard({
     saldoDisponible
   )
 
+  const tieneAcuerdo = acuerdo != null && acuerdo.activo && acuerdo.estado === 'activo'
+
   return (
     <>
       <div className="rounded-xl border bg-card px-5 py-4 flex flex-col gap-3">
@@ -140,7 +149,10 @@ export default function CompromisoCard({
               <Badge variant={TIPO_PAGO_VARIANT[compromiso.tipo_pago] ?? 'default'}>
                 {TIPO_PAGO_LABEL[compromiso.tipo_pago] ?? compromiso.tipo_pago}
               </Badge>
-              {compromiso.prioridad && (
+              {tieneAcuerdo && (
+                <Badge variant="warning">En acuerdo</Badge>
+              )}
+              {compromiso.prioridad && !tieneAcuerdo && (
                 <Badge variant={PRIORIDAD_VARIANT[compromiso.prioridad] ?? 'default'}>
                   {compromiso.prioridad}
                 </Badge>
@@ -173,6 +185,17 @@ export default function CompromisoCard({
 
           {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
+            {/* Botón acuerdo de pago — solo para préstamos sin acuerdo activo */}
+            {compromiso.tipo_pago === 'prestamo' && !tieneAcuerdo && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setAcuerdoOpen(true)}
+                title="Registrar acuerdo de pago"
+              >
+                <FileText className="size-3.5 text-orange-500" />
+              </Button>
+            )}
             <Button variant="ghost" size="icon-sm" onClick={() => setEditOpen(true)}>
               <Pencil className="size-3.5" />
             </Button>
@@ -186,28 +209,60 @@ export default function CompromisoCard({
           </div>
         </div>
 
-        {/* Barra de progreso saldo vs monto */}
-        <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Saldo disponible: {formatMXN(saldoDisponible)}</span>
-            <span>
-              {saldoDisponible >= monto ? (
-                <span className="text-emerald-600">Alcanza ✓</span>
-              ) : (
-                <span className="text-destructive">
-                  Faltan {formatMXN(monto - saldoDisponible)}
-                </span>
-              )}
-            </span>
+        {/* Acuerdo de pago activo */}
+        {tieneAcuerdo ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-orange-300 bg-orange-500/10 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide">
+                Acuerdo de pago activo
+              </p>
+              <span className="text-xs text-orange-600">
+                Límite: {formatFecha(acuerdo!.fecha_limite)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Acordado</p>
+                <p className="font-semibold tabular-nums">{formatMXN(Number(acuerdo!.monto_acordado))}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pendiente</p>
+                <p className="font-semibold tabular-nums text-destructive">
+                  {formatMXN(Number(acuerdo!.monto_pendiente))}
+                </p>
+              </div>
+            </div>
+            <ProgressBar
+              value={Number(acuerdo!.monto_acordado) - Number(acuerdo!.monto_pendiente)}
+              max={Number(acuerdo!.monto_acordado)}
+            />
           </div>
-          <ProgressBar value={saldoDisponible} max={monto} />
-        </div>
+        ) : (
+          <>
+            {/* Barra de progreso saldo vs monto */}
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Saldo disponible: {formatMXN(saldoDisponible)}</span>
+                <span>
+                  {saldoDisponible >= monto ? (
+                    <span className="text-emerald-600">Alcanza ✓</span>
+                  ) : (
+                    <span className="text-destructive">
+                      Faltan {formatMXN(monto - saldoDisponible)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <ProgressBar value={saldoDisponible} max={monto} />
+            </div>
 
-        {/* Recomendación */}
-        <RecomendacionBadge recomendacion={recomendacion} />
+            {/* Recomendación */}
+            <RecomendacionBadge recomendacion={recomendacion} />
+          </>
+        )}
 
         {/* Liquidación: pagos restantes y barra de progreso (MSI / Préstamo) */}
-        {showLiquidacion && (mensualidadesRestantes != null || compromiso.fecha_fin_estimada) && (
+        {showLiquidacion && !tieneAcuerdo && (mensualidadesRestantes != null || compromiso.fecha_fin_estimada) && (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               {mensualidadesRestantes != null && (
@@ -227,7 +282,7 @@ export default function CompromisoCard({
           </div>
         )}
 
-        {/* Footer: pagado o botón */}
+        {/* Footer: pagado / botón abono / marcar pagado */}
         {pagadoEsteMes != null ? (
           <div className="flex items-center gap-2 rounded-md bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="size-4 shrink-0" />
@@ -235,6 +290,15 @@ export default function CompromisoCard({
               Pagado este mes — <span className="font-semibold">{formatMXN(pagadoEsteMes)}</span>
             </span>
           </div>
+        ) : tieneAcuerdo ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start border-orange-400 text-orange-600 hover:bg-orange-50"
+            onClick={() => setAbonoOpen(true)}
+          >
+            Registrar abono
+          </Button>
         ) : (
           <Button
             variant="outline"
@@ -264,8 +328,7 @@ export default function CompromisoCard({
         )}
       </div>
 
-      {/* Modales */}
-      {/* Modal eliminar — compromiso recurrente (dos opciones) */}
+      {/* Modal eliminar — compromiso recurrente */}
       <Dialog.Root open={deleteOpen} onOpenChange={deleteLoading ? undefined : setDeleteOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
@@ -273,57 +336,31 @@ export default function CompromisoCard({
             className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 duration-200"
             aria-describedby="delete-recurrente-desc"
           >
-            <Dialog.Title className="text-base font-semibold mb-1">
-              Eliminar compromiso
-            </Dialog.Title>
-            <Dialog.Description
-              id="delete-recurrente-desc"
-              className="text-sm text-muted-foreground mb-5"
-            >
-              <span className="font-medium text-foreground">{compromiso.nombre}</span> es un compromiso recurrente.
-              ¿Cómo deseas eliminarlo?
+            <Dialog.Title className="text-base font-semibold mb-1">Eliminar compromiso</Dialog.Title>
+            <Dialog.Description id="delete-recurrente-desc" className="text-sm text-muted-foreground mb-5">
+              <span className="font-medium text-foreground">{compromiso.nombre}</span> es un compromiso recurrente. ¿Cómo deseas eliminarlo?
             </Dialog.Description>
-
             <div className="flex flex-col gap-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto py-3 px-4"
-                onClick={() => handleEliminar('este_mes')}
-                disabled={deleteLoading}
-              >
+              <Button variant="outline" className="w-full justify-start h-auto py-3 px-4" onClick={() => handleEliminar('este_mes')} disabled={deleteLoading}>
                 <div className="text-left">
                   <p className="text-sm font-medium">Saltar este mes</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Avanza la fecha al mes siguiente. El compromiso sigue activo.
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Avanza la fecha al mes siguiente. El compromiso sigue activo.</p>
                 </div>
               </Button>
-              <Button
-                variant="destructive"
-                className="w-full justify-start h-auto py-3 px-4"
-                onClick={() => handleEliminar('completo')}
-                disabled={deleteLoading}
-              >
+              <Button variant="destructive" className="w-full justify-start h-auto py-3 px-4" onClick={() => handleEliminar('completo')} disabled={deleteLoading}>
                 <div className="text-left">
-                  <p className="text-sm font-medium">
-                    {deleteLoading ? 'Eliminando...' : 'Eliminar completamente'}
-                  </p>
-                  <p className="text-xs opacity-80 mt-0.5">
-                    Desactiva el compromiso. No se puede deshacer.
-                  </p>
+                  <p className="text-sm font-medium">{deleteLoading ? 'Eliminando...' : 'Eliminar completamente'}</p>
+                  <p className="text-xs opacity-80 mt-0.5">Desactiva el compromiso. No se puede deshacer.</p>
                 </div>
               </Button>
               <Dialog.Close asChild>
-                <Button variant="ghost" className="w-full" disabled={deleteLoading}>
-                  Cancelar
-                </Button>
+                <Button variant="ghost" className="w-full" disabled={deleteLoading}>Cancelar</Button>
               </Dialog.Close>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* Modal eliminar — compromiso no recurrente (confirmación simple) */}
       <ConfirmarAccionModal
         open={deleteSimpleOpen}
         onOpenChange={setDeleteSimpleOpen}
@@ -335,12 +372,7 @@ export default function CompromisoCard({
         loading={deleteLoading}
       />
 
-      <CompromisoForm
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        compromiso={compromiso}
-        tarjetas={tarjetas}
-      />
+      <CompromisoForm open={editOpen} onOpenChange={setEditOpen} compromiso={compromiso} tarjetas={tarjetas} />
 
       <PagarModal
         open={pagarOpen}
@@ -363,6 +395,25 @@ export default function CompromisoCard({
           })
         }
       />
+
+      <AcuerdoPagoForm
+        open={acuerdoOpen}
+        onOpenChange={setAcuerdoOpen}
+        compromisoId={compromiso.id}
+        compromisoNombre={compromiso.nombre}
+      />
+
+      {tieneAcuerdo && (
+        <RegistrarAbonoModal
+          open={abonoOpen}
+          onOpenChange={setAbonoOpen}
+          acuerdoId={acuerdo!.id}
+          compromisoId={compromiso.id}
+          compromisoNombre={compromiso.nombre}
+          montoPendiente={Number(acuerdo!.monto_pendiente)}
+          cuentas={cuentas}
+        />
+      )}
     </>
   )
 }
