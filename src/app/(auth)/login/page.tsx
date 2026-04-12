@@ -15,9 +15,8 @@ export default function LoginPage() {
 
   return (
     <div className="w-full max-w-sm">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Finus</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Planificación financiera inteligente</p>
+      <div className="mb-8 flex flex-col items-center gap-3">
+        <img src="/finus-logotipo.svg" height={48} alt="Finus" style={{ height: 48 }} />
       </div>
 
       <Card>

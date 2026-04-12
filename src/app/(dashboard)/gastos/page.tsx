@@ -54,7 +54,7 @@ export default async function GastosPage({ searchParams }: Props) {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Gastos</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="hidden md:block text-sm text-muted-foreground mt-0.5">
           Registro de gastos por período
         </p>
       </div>

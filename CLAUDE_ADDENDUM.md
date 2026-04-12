@@ -399,3 +399,33 @@ Agregar categoría `casa` al listado de categorías disponibles en `RegistrarGas
 - Mantenimiento
 - Otros gastos domésticos que no encajan en categorías existentes
 
+
+---
+
+### 19. Conexión entre Gastos Previstos y Gastos registrados
+
+**Decisión:**
+Gastos Previstos y Gastos registrados deben estar conectados para evitar doble captura. Un gasto previsto realizado genera automáticamente una transacción en gastos, y viceversa.
+
+**Flujo A — Desde `/proyeccion` (marcar previsto como realizado):**
+1. Usuario toca "Marcar como realizado" en un GastoPrevistoCard
+2. Si el monto es variable (certeza media/baja) → preguntar monto real
+3. Finus registra automáticamente la transacción en `transacciones` con los datos del previsto
+4. Marca el previsto como `realizado = true` y guarda `monto_real`
+5. El usuario NO necesita ir a `/gastos` a registrarlo por separado
+
+**Flujo B — Desde `/gastos` (registrar gasto manual):**
+1. Usuario registra un gasto normalmente
+2. Finus busca gastos previstos activos no realizados que coincidan por categoría o nombre similar
+3. Si encuentra coincidencia → muestra sugerencia: "¿Este gasto corresponde a [Señora de limpieza $600]?"
+4. Si confirma → marca el previsto como realizado automáticamente
+5. Si no confirma → registra el gasto normalmente sin tocar previstos
+
+**Regla general:**
+Un gasto previsto realizado siempre tiene una transacción en gastos asociada. Nunca se registran por separado.
+
+**Implementación técnica:**
+- En `gastos_previstos` agregar columna `transaccion_id uuid FK → transacciones` para mantener el vínculo
+- En `confirmarGastoPrevisto` action → insert en transacciones + update gastos_previstos con transaccion_id y realizado = true
+- En `registrarGasto` action → buscar coincidencias en gastos_previstos y ofrecer vinculación
+

@@ -95,7 +95,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-4 max-w-5xl mx-auto">
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Tu flujo de efectivo de un vistazo</p>
+        <p className="hidden md:block text-sm text-muted-foreground">Tu flujo de efectivo de un vistazo</p>
       </div>
 
       <Suspense

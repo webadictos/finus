@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { LogoutButton } from '@/components/dashboard/LogoutButton'
+import MobileNav from '@/components/dashboard/MobileNav'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -41,13 +42,21 @@ export default async function DashboardLayout({
 
   const email = user?.email ?? ''
 
+  const [cuentasRes, tarjetasRes] = await Promise.all([
+    supabase.from('cuentas').select('*').eq('activa', true).order('nombre', { ascending: true }),
+    supabase.from('tarjetas').select('*').eq('activa', true).order('nombre', { ascending: true }),
+  ])
+
+  const cuentas = cuentasRes.data ?? []
+  const tarjetas = tarjetasRes.data ?? []
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar — desktop */}
       <aside className="hidden md:flex w-56 shrink-0 flex-col border-r bg-card">
         {/* Logo */}
         <div className="flex items-center gap-2 px-5 py-5 border-b">
-          <span className="text-lg font-bold tracking-tight">Finus</span>
+          <img src="/finus.svg" height={32} alt="Finus" style={{ height: 32 }} />
         </div>
 
         {/* Nav */}
@@ -57,7 +66,7 @@ export default async function DashboardLayout({
               key={href}
               href={href}
               className={cn(
-                'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
+                'flex items-center gap-2.5 rounded-md px-3 py-2 text-[15px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
               )}
             >
               <Icon className="size-4 shrink-0" />
@@ -82,25 +91,15 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between border-b bg-card px-4 py-3">
-          <span className="text-base font-bold">Finus</span>
+          <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
           <LogoutButton />
         </header>
 
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        {/* pb-16 leaves space for the fixed mobile bottom nav */}
+        <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
 
-        {/* Bottom nav — mobile */}
-        <nav className="md:hidden flex border-t bg-card">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex-1 flex flex-col items-center gap-1 py-2 text-[10px] font-medium text-muted-foreground hover:text-foreground"
-            >
-              <Icon className="size-5" />
-              <span className="leading-none">{label}</span>
-            </Link>
-          ))}
-        </nav>
+        {/* Bottom nav — mobile (fixed, rendered via Client Component) */}
+        <MobileNav cuentas={cuentas} tarjetas={tarjetas} />
       </div>
     </div>
   )

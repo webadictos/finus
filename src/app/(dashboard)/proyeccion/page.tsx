@@ -45,7 +45,7 @@ export default async function ProyeccionPage() {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Proyección</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <p className="hidden md:block text-sm text-muted-foreground mt-0.5">
           Visualiza tu flujo de efectivo futuro
         </p>
       </div>

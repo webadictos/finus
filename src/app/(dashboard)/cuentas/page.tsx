@@ -40,7 +40,7 @@ export default async function CuentasPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">Cuentas</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="hidden md:block text-sm text-muted-foreground">
             Tus cuentas bancarias, efectivo e inversiones
           </p>
         </div>

@@ -46,7 +46,7 @@ export default async function IngresosPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">Ingresos</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="hidden md:block text-sm text-muted-foreground">
             Flujo de entradas esperadas y confirmadas
           </p>
         </div>

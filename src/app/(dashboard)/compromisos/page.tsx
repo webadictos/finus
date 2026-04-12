@@ -82,7 +82,7 @@ export default async function CompromisosPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">Compromisos</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="hidden md:block text-sm text-muted-foreground">
             Pagos recurrentes y deudas activas
           </p>
         </div>
