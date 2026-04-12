@@ -14,6 +14,70 @@ export type MarcarPagadoResult = {
   monto?: number
 }
 
+export async function crearCargoLinea(
+  lineaId: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const nombre = (formData.get('nombre') as string).trim()
+  const tipo = formData.get('tipo') as 'revolvente' | 'msi' | 'disposicion_efectivo'
+  const monto_original = parseFloat(formData.get('monto_original') as string)
+
+  if (!nombre) return { error: 'El nombre es requerido' }
+  if (isNaN(monto_original) || monto_original <= 0) return { error: 'El monto original es requerido' }
+
+  let saldo_pendiente: number
+  let mensualidades_totales: number | null = null
+  let mensualidades_restantes: number | null = null
+  let monto_mensualidad: number | null = null
+  let tasa_efectiva_anual = 0
+
+  if (tipo === 'revolvente') {
+    saldo_pendiente = monto_original
+  } else {
+    // msi | disposicion_efectivo
+    const rawMeses = parseInt(formData.get('mensualidades_totales') as string)
+    const rawMensualidad = parseFloat(formData.get('monto_mensualidad') as string)
+    const rawTasa = parseFloat(formData.get('tasa_efectiva_anual') as string)
+
+    mensualidades_totales = isNaN(rawMeses) || rawMeses <= 0 ? null : rawMeses
+    monto_mensualidad = isNaN(rawMensualidad) || rawMensualidad <= 0 ? null : rawMensualidad
+    tasa_efectiva_anual = isNaN(rawTasa) ? 0 : rawTasa
+    mensualidades_restantes = mensualidades_totales
+
+    // saldo_pendiente = mensualidad × meses restantes, o monto_original como fallback
+    saldo_pendiente =
+      monto_mensualidad != null && mensualidades_totales != null
+        ? monto_mensualidad * mensualidades_totales
+        : monto_original
+  }
+
+  const { error } = await supabase.from('cargos_linea').insert({
+    linea_credito_id: lineaId,
+    usuario_id: user.id,
+    nombre,
+    tipo,
+    monto_original,
+    monto_mensualidad,
+    mensualidades_totales,
+    mensualidades_restantes,
+    saldo_pendiente,
+    tasa_efectiva_anual,
+    activo: true,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
 export async function crearCompromiso(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const {
@@ -338,6 +402,51 @@ export async function registrarAbono(
       })
       .eq('id', acuerdoId)
       .eq('usuario_id', user.id)
+  }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
+export async function registrarPagoLinea(
+  lineaId: string,
+  montoPagado: number,
+  tipoPago: 'minimo' | 'sin_intereses' | 'parcial' | 'total',
+  cuentaOrigenId: string | null
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 1. Insertar en pagos_linea
+  const { error: insertError } = await supabase.from('pagos_linea').insert({
+    linea_credito_id: lineaId,
+    usuario_id: user.id,
+    fecha: hoy,
+    monto_pagado: montoPagado,
+    tipo_pago: tipoPago,
+    cuenta_origen_id: cuentaOrigenId,
+  })
+  if (insertError) return { error: insertError.message }
+
+  // 2. Decrementar saldo_actual de la línea (atómico, evita TOCTOU)
+  const { error: rpcError } = await supabase.rpc('decrementar_saldo_linea', {
+    p_linea_id: lineaId,
+    p_monto: montoPagado,
+  })
+  if (rpcError) return { error: rpcError.message }
+
+  // 3. Descontar del saldo de la cuenta si se especificó
+  if (cuentaOrigenId) {
+    await supabase.rpc('decrementar_saldo', {
+      p_cuenta_id: cuentaOrigenId,
+      p_monto: montoPagado,
+    })
   }
 
   revalidatePath('/compromisos')

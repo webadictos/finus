@@ -594,6 +594,162 @@ export interface Database {
         }
         Relationships: Rel[]
       }
+      lineas_credito: {
+        Row: {
+          id: string
+          usuario_id: string
+          nombre: string
+          banco: string | null
+          tipo: 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+          titular_tipo: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
+          titular_nombre: string | null
+          ultimos_4: string | null
+          limite_credito: number | null
+          saldo_actual: number
+          saldo_al_corte: number | null
+          pago_sin_intereses: number | null
+          pago_minimo: number | null
+          fecha_proximo_pago: string | null
+          dia_corte: number | null
+          dia_limite_pago: number | null
+          tasa_interes_anual: number | null
+          activa: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          nombre: string
+          banco?: string | null
+          tipo: 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+          titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
+          titular_nombre?: string | null
+          ultimos_4?: string | null
+          limite_credito?: number | null
+          saldo_actual?: number
+          saldo_al_corte?: number | null
+          pago_sin_intereses?: number | null
+          pago_minimo?: number | null
+          fecha_proximo_pago?: string | null
+          dia_corte?: number | null
+          dia_limite_pago?: number | null
+          tasa_interes_anual?: number | null
+          activa?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          nombre?: string
+          banco?: string | null
+          tipo?: 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+          titular_tipo?: 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
+          titular_nombre?: string | null
+          ultimos_4?: string | null
+          limite_credito?: number | null
+          saldo_actual?: number
+          saldo_al_corte?: number | null
+          pago_sin_intereses?: number | null
+          pago_minimo?: number | null
+          fecha_proximo_pago?: string | null
+          dia_corte?: number | null
+          dia_limite_pago?: number | null
+          tasa_interes_anual?: number | null
+          activa?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
+      cargos_linea: {
+        Row: {
+          id: string
+          linea_credito_id: string
+          usuario_id: string
+          nombre: string
+          tipo: 'revolvente' | 'msi' | 'disposicion_efectivo'
+          monto_original: number
+          monto_mensualidad: number | null
+          mensualidades_totales: number | null
+          mensualidades_restantes: number | null
+          saldo_pendiente: number
+          tasa_efectiva_anual: number | null
+          notas: string | null
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          linea_credito_id: string
+          usuario_id: string
+          nombre: string
+          tipo: 'revolvente' | 'msi' | 'disposicion_efectivo'
+          monto_original: number
+          monto_mensualidad?: number | null
+          mensualidades_totales?: number | null
+          mensualidades_restantes?: number | null
+          saldo_pendiente: number
+          tasa_efectiva_anual?: number | null
+          notas?: string | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          linea_credito_id?: string
+          usuario_id?: string
+          nombre?: string
+          tipo?: 'revolvente' | 'msi' | 'disposicion_efectivo'
+          monto_original?: number
+          monto_mensualidad?: number | null
+          mensualidades_totales?: number | null
+          mensualidades_restantes?: number | null
+          saldo_pendiente?: number
+          tasa_efectiva_anual?: number | null
+          notas?: string | null
+          activo?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
+      pagos_linea: {
+        Row: {
+          id: string
+          linea_credito_id: string
+          usuario_id: string
+          fecha: string
+          monto_pagado: number
+          tipo_pago: 'minimo' | 'sin_intereses' | 'parcial' | 'total'
+          cuenta_origen_id: string | null
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          linea_credito_id: string
+          usuario_id: string
+          fecha?: string
+          monto_pagado: number
+          tipo_pago?: 'minimo' | 'sin_intereses' | 'parcial' | 'total'
+          cuenta_origen_id?: string | null
+          notas?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          linea_credito_id?: string
+          usuario_id?: string
+          fecha?: string
+          monto_pagado?: number
+          tipo_pago?: 'minimo' | 'sin_intereses' | 'parcial' | 'total'
+          cuenta_origen_id?: string | null
+          notas?: string | null
+        }
+        Relationships: Rel[]
+      }
       metas: {
         Row: {
           id: string
@@ -647,6 +803,14 @@ export interface Database {
       }
       recalcular_proyecto: {
         Args: { p_proyecto_id: string }
+        Returns: void
+      }
+      calcular_pago_sugerido_linea: {
+        Args: { p_linea_id: string }
+        Returns: number
+      }
+      decrementar_saldo_linea: {
+        Args: { p_linea_id: string; p_monto: number }
         Returns: void
       }
     }
