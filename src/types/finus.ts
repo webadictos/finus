@@ -176,6 +176,26 @@ export interface IngresoProximo {
   fecha_esperada: string
 }
 
+export interface LineaParaRecomendacion {
+  id: string
+  nombre: string
+  tipo: 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+  saldo_al_corte: number | null
+  pago_sin_intereses: number | null
+  pago_minimo: number | null
+  fecha_proximo_pago: string | null
+  tasa_interes_anual: number | null
+  cargos: {
+    id: string
+    tipo: 'revolvente' | 'msi' | 'disposicion_efectivo'
+    nombre: string
+    monto_mensualidad: number | null
+    mensualidades_restantes: number | null
+    saldo_pendiente: number
+    tasa_efectiva_anual: number | null
+  }[]
+}
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 export interface ResumenFlujoCaja {

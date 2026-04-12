@@ -15,6 +15,7 @@ type Ingreso = Database['public']['Tables']['ingresos']['Row']
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type GastoPrevisto = Database['public']['Tables']['gastos_previstos']['Row']
 type LineaCredito = Database['public']['Tables']['lineas_credito']['Row']
+type CargoLinea = Database['public']['Tables']['cargos_linea']['Row']
 
 // Esqueleto simple reutilizable para Suspense
 function CardSkeleton({ className = '' }: { className?: string }) {
@@ -29,7 +30,7 @@ function CardSkeleton({ className = '' }: { className?: string }) {
 async function DashboardData() {
   const supabase = await createClient()
 
-  const [cuentasRes, ingresosRes, compromisosRes, gastosPrevistoRes, lineasRes] = await Promise.all([
+  const [cuentasRes, ingresosRes, compromisosRes, gastosPrevistoRes, lineasRes, cargosRes] = await Promise.all([
     supabase
       .from('cuentas')
       .select('*')
@@ -55,6 +56,10 @@ async function DashboardData() {
       .select('*')
       .eq('activa', true)
       .order('nombre', { ascending: true }),
+    supabase
+      .from('cargos_linea')
+      .select('*')
+      .eq('activo', true),
   ])
 
   const cuentas: Cuenta[] = cuentasRes.data ?? []
@@ -62,6 +67,7 @@ async function DashboardData() {
   const compromisos: Compromiso[] = compromisosRes.data ?? []
   const gastosPrevistos: GastoPrevisto[] = gastosPrevistoRes.data ?? []
   const lineas: LineaCredito[] = lineasRes.data ?? []
+  const cargos: CargoLinea[] = cargosRes.data ?? []
 
   // Ingresos confirmados sin cuenta_destino_id: no llamaron incrementar_saldo,
   // por lo que no están reflejados en cuentas.saldo_actual.
@@ -76,7 +82,7 @@ async function DashboardData() {
   return (
     <>
       <SaldoHeader cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
-      <KPICards cuentas={cuentas} ingresos={ingresos} compromisos={compromisos} />
+      <KPICards cuentas={cuentas} ingresos={ingresos} compromisos={compromisos} lineas={lineas} />
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-0">
           <AconsejameButton />
@@ -91,7 +97,7 @@ async function DashboardData() {
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AlertasVencimiento compromisos={compromisos} saldoDisponible={saldoDisponible} />
+        <AlertasVencimiento compromisos={compromisos} lineas={lineas} cargos={cargos} saldoDisponible={saldoDisponible} />
         <ProximosIngresos ingresos={ingresos} cuentas={cuentas} />
         <ProximosGastosPrevistos gastos={gastosPrevistos} />
       </div>

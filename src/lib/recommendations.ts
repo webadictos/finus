@@ -4,6 +4,7 @@ import type {
   IngresoProximo,
   Recomendacion,
   ColorRecomendacion,
+  LineaParaRecomendacion,
 } from '@/types/finus'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -422,6 +423,155 @@ export function getRecomendaciones(
     compromiso,
     recomendacion: getRecomendacion(compromiso, saldoDisponible, ingresoProximo),
   }))
+
+  return resultados.sort(
+    (a, b) =>
+      getPrioridadColor(b.recomendacion.color) -
+      getPrioridadColor(a.recomendacion.color)
+  )
+}
+
+// ─── Líneas de crédito ────────────────────────────────────────────────────────
+
+function recomendarLinea(
+  linea: LineaParaRecomendacion,
+  saldo: number,
+  ingresoProximo: IngresoProximo | null
+): Recomendacion {
+  const saldoTotal = Number(linea.saldo_al_corte ?? 0)
+  const pagoSinIntereses = Number(linea.pago_sin_intereses ?? 0)
+  const minimo = Number(linea.pago_minimo ?? 0)
+  const colchon = Math.ceil(minimo * FACTOR_COLCHON)
+  const tasaMensual = linea.tasa_interes_anual != null ? Number(linea.tasa_interes_anual) / 12 : null
+
+  // Caso 1: Liquidación total posible
+  if (saldoTotal > 0 && saldo >= saldoTotal) {
+    return {
+      accion: 'Liquídala — cierra esta deuda hoy',
+      detalle: `Tienes suficiente para saldar los ${formatMXN(saldoTotal)} completos`,
+      color: 'verde',
+      monto_sugerido: saldoTotal,
+      monto_minimo: minimo,
+      interes_estimado_mensual: null,
+      fecha_ingreso_proximo: null,
+      nombre_ingreso_proximo: null,
+    }
+  }
+
+  // Caso 2: Pago de corte sin intereses
+  if (pagoSinIntereses > 0 && saldo >= pagoSinIntereses) {
+    return {
+      accion: 'Paga el corte completo — sin intereses',
+      detalle: `Pago de ${formatMXN(pagoSinIntereses)} cubre el periodo sin generar intereses`,
+      color: 'amarillo',
+      monto_sugerido: pagoSinIntereses,
+      monto_minimo: minimo,
+      interes_estimado_mensual: null,
+      fecha_ingreso_proximo: null,
+      nombre_ingreso_proximo: null,
+    }
+  }
+
+  // Caso 3: Entre mínimo+colchón y pago sin intereses
+  if (minimo > 0 && saldo >= minimo + colchon) {
+    const montoMaximo = pagoSinIntereses > 0
+      ? Math.min(saldo, pagoSinIntereses - 1)
+      : saldo
+    const interesEstimado = calcularInteresEstimado(saldoTotal - minimo, tasaMensual)
+
+    return {
+      accion: `Paga entre ${formatMXN(minimo + colchon)} y ${formatMXN(montoMaximo)}`,
+      detalle: interesEstimado
+        ? `Pagar más reduce intereses. Si pagas el mínimo: ${formatMXN(interesEstimado)}/mes`
+        : `Paga lo más que puedas para reducir el saldo`,
+      color: 'naranja',
+      monto_sugerido: montoMaximo,
+      monto_minimo: minimo,
+      interes_estimado_mensual: interesEstimado,
+      fecha_ingreso_proximo: null,
+      nombre_ingreso_proximo: null,
+    }
+  }
+
+  // Caso 4: Solo alcanza el mínimo
+  if (minimo > 0 && saldo >= minimo) {
+    const interesEstimado = calcularInteresEstimado(saldoTotal - minimo, tasaMensual)
+
+    return {
+      accion: 'Paga el mínimo',
+      detalle: interesEstimado
+        ? `Interés estimado: ${formatMXN(interesEstimado)}/mes sobre el saldo restante`
+        : `Solo cubre el pago mínimo requerido`,
+      color: 'rojo',
+      monto_sugerido: minimo,
+      monto_minimo: minimo,
+      interes_estimado_mensual: interesEstimado,
+      fecha_ingreso_proximo: null,
+      nombre_ingreso_proximo: null,
+    }
+  }
+
+  // Caso 5: Ingreso próximo llega antes del vencimiento
+  const ingreso = ingresoAntesDelVencimiento(linea.fecha_proximo_pago, ingresoProximo)
+  if (ingreso) {
+    return {
+      accion: `Espera al ${new Date(ingreso.fecha_esperada).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} — llega ${ingreso.nombre}`,
+      detalle: `Ingreso de ${formatMXN(ingreso.monto)} llega antes del vencimiento`,
+      color: 'morado',
+      monto_sugerido: minimo,
+      monto_minimo: minimo,
+      interes_estimado_mensual: null,
+      fecha_ingreso_proximo: ingreso.fecha_esperada,
+      nombre_ingreso_proximo: ingreso.nombre,
+    }
+  }
+
+  // Caso 6: Sin liquidez y sin ingreso próximo
+  return {
+    accion: 'No pagues hoy — sin liquidez',
+    detalle: `Saldo insuficiente para el mínimo (${formatMXN(minimo)}). Evalúa renegociar o buscar fondos.`,
+    color: 'rojo_fuerte',
+    monto_sugerido: null,
+    monto_minimo: minimo,
+    interes_estimado_mensual: calcularInteresEstimado(saldoTotal, tasaMensual),
+    fecha_ingreso_proximo: null,
+    nombre_ingreso_proximo: null,
+  }
+}
+
+/**
+ * Genera una recomendación de pago para una línea de crédito dado el saldo disponible.
+ *
+ * Usa los campos globales de la línea (pago_sin_intereses, pago_minimo, saldo_al_corte)
+ * que representan el estado de cuenta actual.
+ */
+export function getRecomendacionLinea(
+  linea: LineaParaRecomendacion,
+  saldoDisponible: number,
+  ingresoProximo: IngresoProximo | null = null
+): Recomendacion {
+  return recomendarLinea(linea, saldoDisponible, ingresoProximo)
+}
+
+/**
+ * Genera recomendaciones para una lista de líneas de crédito, ordenadas por urgencia.
+ *
+ * @param ingresos - Lista de ingresos próximos; para cada línea se busca el primero
+ *                   que llega antes de su vencimiento.
+ */
+export function getRecomendacionesLineas(
+  lineas: LineaParaRecomendacion[],
+  saldoDisponible: number,
+  ingresos: IngresoProximo[]
+): Array<{ linea: LineaParaRecomendacion; recomendacion: Recomendacion }> {
+  const resultados = lineas.map((linea) => {
+    const ingresoProximo =
+      ingresos.find((i) => ingresoAntesDelVencimiento(linea.fecha_proximo_pago, i) !== null) ?? null
+    return {
+      linea,
+      recomendacion: recomendarLinea(linea, saldoDisponible, ingresoProximo),
+    }
+  })
 
   return resultados.sort(
     (a, b) =>

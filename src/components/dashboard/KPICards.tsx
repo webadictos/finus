@@ -1,15 +1,17 @@
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
-import { ArrowDown, ArrowUp, Calendar, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Calendar, CreditCard, Wallet } from 'lucide-react'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
+type LineaCredito = Database['public']['Tables']['lineas_credito']['Row']
 
 interface Props {
   cuentas: Cuenta[]
   ingresos: Ingreso[]
   compromisos: Compromiso[]
+  lineas: LineaCredito[]
 }
 
 function calcularPagoMinimo(c: Compromiso): number {
@@ -53,7 +55,7 @@ function KPICard({ label, value, sublabel, icon, colorClass = 'text-foreground' 
   )
 }
 
-export default function KPICards({ cuentas, ingresos, compromisos }: Props) {
+export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Props) {
   const hoy = new Date()
   const en15dias = new Date(hoy)
   en15dias.setDate(en15dias.getDate() + 15)
@@ -80,12 +82,23 @@ export default function KPICards({ cuentas, ingresos, compromisos }: Props) {
     })
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
-  // 3. Por pagar — suma de mínimos de compromisos activos
-  const porPagar = compromisos
+  // 3. Por pagar — compromisos fijos + líneas de crédito con vencimiento próximo
+  const porPagarCompromisos = compromisos
     .filter((c) => c.activo)
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
 
-  // 4. Proyección 15 días = disponible + ingresos confirmados próx 15d - compromisos próx 15d
+  const lineasProx30 = lineas.filter((l) => {
+    if (!l.fecha_proximo_pago) return true // sin fecha = incluir siempre
+    const fecha = new Date(l.fecha_proximo_pago)
+    return fecha >= hoy && fecha <= en30dias
+  })
+  const porPagarLineas = lineasProx30.reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
+  const porPagar = porPagarCompromisos + porPagarLineas
+
+  // 4. Líneas de crédito — totales de pago sin intereses
+  const totalPSI = lineas.reduce((sum, l) => sum + Number(l.pago_sin_intereses ?? 0), 0)
+
+  // 5. Proyección 15 días = disponible + ingresos prob próx 15d - compromisos próx 15d - líneas próx 15d
   const ingresosProx15 = ingresos
     .filter((i) => {
       if (i.estado === 'en_riesgo') return false
@@ -104,7 +117,15 @@ export default function KPICards({ cuentas, ingresos, compromisos }: Props) {
     })
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
 
-  const proyeccion15 = disponible + ingresosProx15 - compromisosProx15
+  const lineasProx15 = lineas
+    .filter((l) => {
+      if (!l.fecha_proximo_pago) return false
+      const fecha = new Date(l.fecha_proximo_pago)
+      return fecha >= hoy && fecha <= en15dias
+    })
+    .reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
+
+  const proyeccion15 = disponible + ingresosProx15 - compromisosProx15 - lineasProx15
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -124,9 +145,16 @@ export default function KPICards({ cuentas, ingresos, compromisos }: Props) {
       <KPICard
         label="Por pagar"
         value={formatMXN(porPagar)}
-        sublabel="Pagos mínimos activos"
+        sublabel={`Compromisos + ${lineas.length} línea${lineas.length !== 1 ? 's' : ''}`}
         icon={<ArrowUp className="size-4 text-destructive" />}
         colorClass="text-destructive"
+      />
+      <KPICard
+        label="Líneas — sin intereses"
+        value={formatMXN(totalPSI)}
+        sublabel={`Mínimos: ${formatMXN(porPagarLineas)}`}
+        icon={<CreditCard className="size-4 text-orange-500" />}
+        colorClass="text-orange-500"
       />
       <KPICard
         label="Proyección 15 días"
