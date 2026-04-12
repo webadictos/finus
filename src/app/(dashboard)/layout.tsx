@@ -9,7 +9,6 @@ import {
   Wallet,
   BarChart3,
   Target,
-  WalletCards,
   Landmark,
   Settings,
 } from 'lucide-react'
@@ -20,7 +19,6 @@ const NAV_ITEMS = [
   { href: '/gastos', label: 'Gastos', icon: Wallet },
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
   { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
-  { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
   { href: '/cuentas', label: 'Cuentas', icon: Landmark },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
   { href: '/metas', label: 'Metas', icon: Target },

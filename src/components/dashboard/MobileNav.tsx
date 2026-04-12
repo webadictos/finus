@@ -12,7 +12,6 @@ import {
   Menu,
   TrendingUp,
   Landmark,
-  WalletCards,
   BarChart3,
   Target,
   Settings,
@@ -33,7 +32,6 @@ interface Props {
 const MAS_ITEMS = [
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
   { href: '/cuentas', label: 'Cuentas', icon: Landmark },
-  { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
   { href: '/metas', label: 'Metas', icon: Target },
   { href: '/configuracion', label: 'Config.', icon: Settings },
