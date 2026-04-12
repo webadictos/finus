@@ -621,6 +621,85 @@ No crear nuevos registros ahí. Usar `lineas_credito` en su lugar.
 - Tania BBVA revolvente
 - Tania Santander MSI
 
+### Actions implementadas en compromisos/actions.ts
+
+**`crearLineaCredito(formData)`** — INSERT en `lineas_credito`.
+`fecha_proximo_pago` se calcula desde `dia_limite_pago`: mes actual si aún
+no ha pasado, mes siguiente si ya pasó.
+
+**`actualizarLineaCredito(id, formData)`** — UPDATE en `lineas_credito`.
+Misma lógica de cálculo de `fecha_proximo_pago`. Filtra por `usuario_id`
+para prevenir edición cruzada.
+
+**`eliminarLineaCredito(id)`** — DELETE en `lineas_credito`.
+Las FK en `cargos_linea` y `pagos_linea` tienen `ON DELETE CASCADE`,
+por lo que el delete borra automáticamente todos los cargos e historial
+de pagos de la línea. No usar `activa = false` — eliminar físicamente.
+
+**`pagarDesdePrestamo(compromisoId, prestamista, montoPrestamo, fechaDevolucion)`**
+Flujo de dos pasos en una sola action:
+1. Registra transacción de pago del compromiso original (monto = `monto_mensualidad`)
+2. Avanza `fecha_proximo_pago` del compromiso (+1 mes)
+3. Inserta un nuevo `compromisos` con:
+   - `nombre`: `"Devolución a [prestamista]"`
+   - `tipo_pago`: `'prestamo'`
+   - `monto_mensualidad`: el monto que el usuario pidió prestado (puede ser ≥ al del compromiso)
+   - `fecha_proximo_pago`: `fechaDevolucion`
+   - `mensualidades_restantes`: `1`
+   - `prioridad`: `'alta'`
+   - `activo`: `true`
+
+No descuenta saldo de ninguna cuenta (el dinero viene de un préstamo externo,
+no de una cuenta registrada en Finus).
+
+### Componentes del nuevo modelo
+
+**`NuevaLineaForm`** — Sheet deslizable para crear o editar líneas.
+Acepta dos props opcionales que activan modos distintos:
+- `lineaId?: string` — si está presente, el form es de edición; llama
+  `actualizarLineaCredito` en lugar de `crearLineaCredito`
+- `initialValues?: LineaInitialValues` — pre-llena todos los campos del form.
+  Sirve tanto para edición (se pasa la línea actual) como para la migración
+  desde `tarjetas` (se pasa el mapeo de campos)
+
+**`LineaCreditoCard`** — menú de 3 puntos (`DropdownMenu` de `radix-ui`)
+en la esquina superior derecha de cada card:
+- "Editar" → abre `NuevaLineaForm` con `lineaId` e `initialValues` pre-llenados
+- "Eliminar" → abre `Dialog` de confirmación; al confirmar llama
+  `eliminarLineaCredito`
+
+**`PagarModal`** (tab Pagos fijos / compromisos) — 4ª opción rápida
+"Pagar desde préstamo" junto a Completo / Sin intereses / Mínimo.
+Al seleccionarla aparece un subformulario inline dentro del mismo modal:
+- `prestamista` (text) — quién presta
+- `monto_prestamo` (number) — default = `monto_mensualidad`, editable
+- `fecha_devolucion` (date) — plazo para devolver
+
+Al confirmar llama `pagarDesdePrestamo` en lugar de `marcarPagado`.
+
+**`CopiarTarjetaButton`** (`src/components/tarjetas/CopiarTarjetaButton.tsx`)
+Botón ícono `CopyPlus` que aparece en cada fila de `/tarjetas`.
+Abre `NuevaLineaForm` pre-llenado con el mapeo:
+
+| `tarjetas`             | → | `lineas_credito` (initialValues)           |
+| ---------------------- | - | ------------------------------------------ |
+| `nombre`               | → | `nombre`                                   |
+| `banco`                | → | `banco`                                    |
+| `tipo`                 | → | `'tarjeta_credito'` (fijo, no se mapea)    |
+| `titular_tipo`         | → | `titular_tipo`                             |
+| `titular_nombre`       | → | `titular_nombre`                           |
+| `ultimos_4`            | → | `ultimos_4`                                |
+| `limite_credito`       | → | `limite_credito`                           |
+| `saldo_al_corte`       | → | `saldo_al_corte`                           |
+| `pago_sin_intereses`   | → | `pago_sin_intereses`                       |
+| `pago_minimo`          | → | `pago_minimo`                              |
+| `dia_corte`            | → | `dia_corte`                                |
+| `dia_limite_pago`      | → | `dia_limite_pago`                          |
+| `tasa_interes_mensual` | → | `tasa_interes_anual` (**× 12**)            |
+
+La tarjeta original **no se elimina automáticamente** — el usuario la borra
+manualmente desde `/tarjetas` cuando confirme que la migración está correcta.
+
 ### Bugs a evitar con el nuevo modelo
 
 - Nunca modificar `saldo_actual` de `lineas_credito` directamente —
@@ -629,6 +708,8 @@ No crear nuevos registros ahí. Usar `lineas_credito` en su lugar.
   (mensualidades_restantes llega a 0), no se elimina el registro
 - El saldo revolvente solo debe tener UN cargo activo por línea
 - Supabase devuelve `numeric` como string — siempre `Number(valor ?? 0)`
+- `tasa_interes_mensual` (tarjetas) ≠ `tasa_interes_anual` (lineas_credito) —
+  al copiar multiplicar × 12; al usar en cálculos mensuales dividir / 12
 
 ## Repositorio
 
