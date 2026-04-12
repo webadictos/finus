@@ -1,11 +1,14 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { ChevronDown, ChevronUp, Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { DropdownMenu, Dialog } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import Badge from '@/components/shared/Badge'
 import PagarLineaModal from '@/components/compromisos/PagarLineaModal'
 import NuevoCargoForm from '@/components/compromisos/NuevoCargoForm'
+import NuevaLineaForm from '@/components/compromisos/NuevaLineaForm'
+import { eliminarLineaCredito } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
@@ -43,6 +46,10 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [pagarOpen, setPagarOpen] = useState(false)
   const [cargoOpen, setCargoOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   const pagoSinInt = linea.pago_sin_intereses != null ? Number(linea.pago_sin_intereses) : null
   const pagoMin = linea.pago_minimo != null ? Number(linea.pago_minimo) : null
@@ -62,6 +69,18 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
       urgenciaVariant = 'warning'
       urgenciaLabel = `En ${dias}d`
     }
+  }
+
+  const handleEliminar = () => {
+    setDeleteError(null)
+    startTransition(async () => {
+      const result = await eliminarLineaCredito(linea.id)
+      if (result.error) {
+        setDeleteError(result.error)
+      } else {
+        setDeleteOpen(false)
+      }
+    })
   }
 
   return (
@@ -108,6 +127,42 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
               >
                 <Plus className="size-4" />
               </Button>
+
+              {/* Menú 3 puntos */}
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Más opciones"
+                  >
+                    <MoreVertical className="size-4" />
+                  </Button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={4}
+                    className="z-50 min-w-[140px] rounded-lg border bg-popover p-1 shadow-md data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+                  >
+                    <DropdownMenu.Item
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer select-none outline-none hover:bg-accent data-[highlighted]:bg-accent"
+                      onSelect={() => setEditOpen(true)}
+                    >
+                      <Pencil className="size-3.5 text-muted-foreground" />
+                      Editar
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer select-none outline-none text-destructive hover:bg-destructive/10 data-[highlighted]:bg-destructive/10"
+                      onSelect={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Eliminar
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -219,6 +274,7 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
         )}
       </div>
 
+      {/* Sheet de nuevo cargo */}
       <NuevoCargoForm
         open={cargoOpen}
         onOpenChange={setCargoOpen}
@@ -226,6 +282,7 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
         lineaNombre={linea.nombre}
       />
 
+      {/* Modal de pago */}
       <PagarLineaModal
         open={pagarOpen}
         onOpenChange={setPagarOpen}
@@ -235,6 +292,71 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
         pagoSinIntereses={pagoSinInt}
         cuentas={cuentas}
       />
+
+      {/* Sheet de edición */}
+      <NuevaLineaForm
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        lineaId={linea.id}
+        initialValues={{
+          nombre: linea.nombre,
+          banco: linea.banco ?? undefined,
+          tipo: linea.tipo,
+          titular_tipo: linea.titular_tipo,
+          titular_nombre: linea.titular_nombre ?? undefined,
+          ultimos_4: linea.ultimos_4 ?? undefined,
+          limite_credito: linea.limite_credito != null ? Number(linea.limite_credito) : null,
+          saldo_al_corte: linea.saldo_al_corte != null ? Number(linea.saldo_al_corte) : null,
+          pago_sin_intereses: linea.pago_sin_intereses != null ? Number(linea.pago_sin_intereses) : null,
+          pago_minimo: linea.pago_minimo != null ? Number(linea.pago_minimo) : null,
+          dia_corte: linea.dia_corte,
+          dia_limite_pago: linea.dia_limite_pago,
+          tasa_interes_anual: linea.tasa_interes_anual != null ? Number(linea.tasa_interes_anual) : null,
+        }}
+      />
+
+      {/* Modal de confirmación de eliminación */}
+      <Dialog.Root open={deleteOpen} onOpenChange={isPending ? undefined : setDeleteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border bg-background p-5 shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 duration-200"
+            aria-describedby="delete-linea-desc"
+          >
+            <Dialog.Title className="text-base font-semibold mb-2">
+              ¿Eliminar {linea.nombre}?
+            </Dialog.Title>
+            <Dialog.Description
+              id="delete-linea-desc"
+              className="text-sm text-muted-foreground leading-relaxed mb-5"
+            >
+              Se eliminarán también todos sus cargos. Esta acción no se puede deshacer.
+            </Dialog.Description>
+
+            {deleteError && (
+              <p className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {deleteError}
+              </p>
+            )}
+
+            <div className="flex gap-2">
+              <Dialog.Close asChild>
+                <Button variant="outline" className="flex-1" disabled={isPending}>
+                  Cancelar
+                </Button>
+              </Dialog.Close>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleEliminar}
+                disabled={isPending}
+              >
+                {isPending ? 'Eliminando...' : 'Eliminar'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   )
 }

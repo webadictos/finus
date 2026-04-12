@@ -5,6 +5,7 @@ import Link from 'next/link'
 import NuevaTarjetaButton from '@/components/tarjetas/NuevaTarjetaButton'
 import EditarTarjetaButton from '@/components/tarjetas/EditarTarjetaButton'
 import EliminarTarjetaButton from '@/components/tarjetas/EliminarTarjetaButton'
+import CopiarTarjetaButton from '@/components/tarjetas/CopiarTarjetaButton'
 import Badge from '@/components/shared/Badge'
 import type { Database } from '@/types/database'
 
@@ -98,6 +99,7 @@ export default async function TarjetasPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <CopiarTarjetaButton tarjeta={t} />
                   <EditarTarjetaButton tarjeta={t} />
                   <EliminarTarjetaButton
                     tarjeta={t}

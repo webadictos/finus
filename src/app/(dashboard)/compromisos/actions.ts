@@ -88,6 +88,99 @@ export async function crearLineaCredito(
   return {}
 }
 
+export async function actualizarLineaCredito(
+  id: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const nombre = (formData.get('nombre') as string).trim()
+  if (!nombre) return { error: 'El nombre es requerido' }
+
+  const tipo = formData.get('tipo') as 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+  const titular_tipo = (formData.get('titular_tipo') as string | null) || 'personal'
+  const banco = (formData.get('banco') as string | null)?.trim() || null
+  const titular_nombre = (formData.get('titular_nombre') as string | null)?.trim() || null
+  const ultimos_4 = (formData.get('ultimos_4') as string | null)?.trim() || null
+
+  const rawLimite = parseFloat(formData.get('limite_credito') as string)
+  const rawCorte = parseFloat(formData.get('saldo_al_corte') as string)
+  const rawPSI = parseFloat(formData.get('pago_sin_intereses') as string)
+  const rawMin = parseFloat(formData.get('pago_minimo') as string)
+  const rawDiaCorte = parseInt(formData.get('dia_corte') as string)
+  const rawDiaLimite = parseInt(formData.get('dia_limite_pago') as string)
+  const rawTasa = parseFloat(formData.get('tasa_interes_anual') as string)
+
+  const limite_credito = isNaN(rawLimite) ? null : rawLimite
+  const saldo_al_corte = isNaN(rawCorte) ? null : rawCorte
+  const pago_sin_intereses = isNaN(rawPSI) ? null : rawPSI
+  const pago_minimo = isNaN(rawMin) ? null : rawMin
+  const dia_corte = isNaN(rawDiaCorte) ? null : rawDiaCorte
+  const dia_limite_pago = isNaN(rawDiaLimite) ? null : rawDiaLimite
+  const tasa_interes_anual = isNaN(rawTasa) ? null : rawTasa
+
+  let fecha_proximo_pago: string | null = null
+  if (dia_limite_pago != null) {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth()
+    const day = today.getDate()
+    const targetMonth = day >= dia_limite_pago ? month + 1 : month
+    const target = new Date(year, targetMonth, dia_limite_pago)
+    fecha_proximo_pago = target.toISOString().split('T')[0]
+  }
+
+  const { error } = await supabase
+    .from('lineas_credito')
+    .update({
+      nombre,
+      banco,
+      tipo,
+      titular_tipo: titular_tipo as 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero',
+      titular_nombre,
+      ultimos_4,
+      limite_credito,
+      saldo_al_corte,
+      saldo_actual: saldo_al_corte ?? 0,
+      pago_sin_intereses,
+      pago_minimo,
+      fecha_proximo_pago,
+      dia_corte,
+      dia_limite_pago,
+      tasa_interes_anual,
+    })
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
+export async function eliminarLineaCredito(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await supabase
+    .from('lineas_credito')
+    .delete()
+    .eq('id', id)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
 export async function crearCargoLinea(
   lineaId: string,
   formData: FormData
@@ -543,6 +636,90 @@ export async function registrarPagoLinea(
   revalidatePath('/compromisos')
   revalidatePath('/')
   return {}
+}
+
+export async function pagarDesdePrestamo(
+  compromisoId: string,
+  prestamista: string,
+  montoPrestamo: number,
+  fechaDevolucion: string
+): Promise<MarcarPagadoResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // Obtener compromiso original para avanzar fecha y crear transacción
+  const { data: compromiso, error: fetchError } = await supabase
+    .from('compromisos')
+    .select('fecha_proximo_pago, nombre, monto_mensualidad')
+    .eq('id', compromisoId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchError || !compromiso) return { error: 'Compromiso no encontrado' }
+
+  const fechaAnterior = compromiso.fecha_proximo_pago
+  const montoPagado = Number(compromiso.monto_mensualidad ?? 0)
+
+  // Calcular siguiente fecha de pago (+1 mes)
+  let siguienteFecha: string | null = null
+  if (fechaAnterior) {
+    const d = new Date(fechaAnterior + 'T12:00:00')
+    d.setMonth(d.getMonth() + 1)
+    siguienteFecha = d.toISOString().split('T')[0]
+  }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 1. Crear transacción de pago del compromiso original
+  const { data: txData, error: txError } = await supabase
+    .from('transacciones')
+    .insert({
+      usuario_id: user.id,
+      compromiso_id: compromisoId,
+      monto: montoPagado,
+      tipo: 'gasto' as const,
+      descripcion: `Pago (préstamo de ${prestamista}): ${compromiso.nombre}`,
+      fecha: hoy,
+    })
+    .select('id')
+    .single()
+
+  if (txError) return { error: txError.message }
+
+  // 2. Avanzar fecha_proximo_pago
+  const { error: updateError } = await supabase
+    .from('compromisos')
+    .update({ fecha_proximo_pago: siguienteFecha })
+    .eq('id', compromisoId)
+    .eq('usuario_id', user.id)
+
+  if (updateError) return { error: updateError.message }
+
+  // 3. Crear compromiso de devolución
+  const { error: devoError } = await supabase.from('compromisos').insert({
+    usuario_id: user.id,
+    nombre: `Devolución a ${prestamista}`,
+    tipo_pago: 'prestamo' as const,
+    monto_mensualidad: montoPrestamo,
+    fecha_proximo_pago: fechaDevolucion,
+    mensualidades_restantes: 1,
+    prioridad: 'alta' as const,
+    activo: true,
+  })
+
+  if (devoError) return { error: devoError.message }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {
+    transaccionId: txData.id,
+    fechaAnterior,
+    cuentaId: null,
+    monto: montoPagado,
+  }
 }
 
 export async function deshacerMarcarPagado(

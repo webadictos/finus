@@ -6,7 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { crearLineaCredito } from '@/app/(dashboard)/compromisos/actions'
+import { crearLineaCredito, actualizarLineaCredito } from '@/app/(dashboard)/compromisos/actions'
 
 type TipoLinea = 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
 type TitularTipo = 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
@@ -26,19 +26,42 @@ const TITULAR_TIPO_LABEL: Record<TitularTipo, string> = {
   tercero: 'Tercero',
 }
 
+export interface LineaInitialValues {
+  nombre?: string
+  banco?: string
+  tipo?: TipoLinea
+  titular_tipo?: TitularTipo
+  titular_nombre?: string
+  ultimos_4?: string
+  limite_credito?: number | null
+  saldo_al_corte?: number | null
+  pago_sin_intereses?: number | null
+  pago_minimo?: number | null
+  dia_corte?: number | null
+  dia_limite_pago?: number | null
+  tasa_interes_anual?: number | null
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Si se proporciona, el form funciona en modo edición */
+  lineaId?: string
+  initialValues?: LineaInitialValues
 }
 
-export default function NuevaLineaForm({ open, onOpenChange }: Props) {
-  const [titularTipo, setTitularTipo] = useState<TitularTipo>('personal')
+export default function NuevaLineaForm({ open, onOpenChange, lineaId, initialValues }: Props) {
+  const esEdicion = Boolean(lineaId)
+
+  const [titularTipo, setTitularTipo] = useState<TitularTipo>(
+    initialValues?.titular_tipo ?? 'personal'
+  )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      setTitularTipo('personal')
+      setTitularTipo(initialValues?.titular_tipo ?? 'personal')
       setError(null)
     }
     onOpenChange(next)
@@ -50,7 +73,9 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
     const fd = new FormData(e.currentTarget)
 
     startTransition(async () => {
-      const result = await crearLineaCredito(fd)
+      const result = esEdicion
+        ? await actualizarLineaCredito(lineaId!, fd)
+        : await crearLineaCredito(fd)
       if (result.error) {
         setError(result.error)
       } else {
@@ -58,6 +83,9 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
       }
     })
   }
+
+  const fmtNum = (val: number | null | undefined) =>
+    val != null ? String(val) : ''
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -70,7 +98,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
           {/* Header */}
           <div className="flex items-start justify-between gap-2 border-b px-5 py-4">
             <Dialog.Title className="text-base font-semibold leading-tight">
-              Nueva línea de crédito
+              {esEdicion ? 'Editar línea de crédito' : 'Nueva línea de crédito'}
             </Dialog.Title>
             <Dialog.Close asChild>
               <Button variant="ghost" size="icon" className="-mt-1 shrink-0">
@@ -88,6 +116,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 id="nombre"
                 name="nombre"
                 placeholder="ej. Liverpool Tania"
+                defaultValue={initialValues?.nombre ?? ''}
                 required
               />
             </div>
@@ -99,6 +128,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 id="banco"
                 name="banco"
                 placeholder="ej. Liverpool"
+                defaultValue={initialValues?.banco ?? ''}
               />
             </div>
 
@@ -108,7 +138,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
               <select
                 id="tipo"
                 name="tipo"
-                defaultValue="tarjeta_credito"
+                defaultValue={initialValues?.tipo ?? 'tarjeta_credito'}
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30"
               >
                 {(Object.keys(TIPO_LINEA_LABEL) as TipoLinea[]).map((t) => (
@@ -144,6 +174,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                   id="titular_nombre"
                   name="titular_nombre"
                   placeholder="ej. Tania"
+                  defaultValue={initialValues?.titular_nombre ?? ''}
                 />
               </div>
             )}
@@ -159,6 +190,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 name="ultimos_4"
                 placeholder="1234"
                 maxLength={4}
+                defaultValue={initialValues?.ultimos_4 ?? ''}
               />
             </div>
 
@@ -172,6 +204,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 min="0"
                 step="0.01"
                 placeholder="0.00"
+                defaultValue={fmtNum(initialValues?.limite_credito)}
               />
             </div>
 
@@ -190,6 +223,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                     min="0"
                     step="0.01"
                     placeholder="0.00"
+                    defaultValue={fmtNum(initialValues?.saldo_al_corte)}
                   />
                 </div>
 
@@ -203,6 +237,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                     min="0"
                     step="0.01"
                     placeholder="0.00"
+                    defaultValue={fmtNum(initialValues?.pago_sin_intereses)}
                   />
                 </div>
 
@@ -216,6 +251,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                     min="0"
                     step="0.01"
                     placeholder="0.00"
+                    defaultValue={fmtNum(initialValues?.pago_minimo)}
                   />
                 </div>
               </div>
@@ -236,6 +272,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                     max="31"
                     step="1"
                     placeholder="20"
+                    defaultValue={fmtNum(initialValues?.dia_corte)}
                   />
                 </div>
                 <div className="flex flex-col gap-1.5 flex-1">
@@ -248,6 +285,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                     max="31"
                     step="1"
                     placeholder="13"
+                    defaultValue={fmtNum(initialValues?.dia_limite_pago)}
                   />
                 </div>
               </div>
@@ -266,6 +304,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 min="0"
                 step="0.01"
                 placeholder="0"
+                defaultValue={fmtNum(initialValues?.tasa_interes_anual)}
               />
             </div>
 
@@ -283,7 +322,7 @@ export default function NuevaLineaForm({ open, onOpenChange }: Props) {
                 </Button>
               </Dialog.Close>
               <Button type="submit" className="flex-1" disabled={isPending}>
-                {isPending ? 'Guardando...' : 'Crear línea'}
+                {isPending ? 'Guardando...' : esEdicion ? 'Guardar cambios' : 'Crear línea'}
               </Button>
             </div>
           </form>
