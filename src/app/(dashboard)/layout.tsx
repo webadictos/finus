@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import MobileNav from '@/components/dashboard/MobileNav'
+import SidebarRegistrarGastoButton from '@/components/dashboard/SidebarRegistrarGastoButton'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -16,11 +17,11 @@ import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/cuentas', label: 'Cuentas', icon: Landmark },
-  { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
-  { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
-  { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
   { href: '/gastos', label: 'Gastos', icon: Wallet },
+  { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
+  { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
+  { href: '/tarjetas', label: 'Tarjetas', icon: WalletCards },
+  { href: '/cuentas', label: 'Cuentas', icon: Landmark },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
   { href: '/metas', label: 'Metas', icon: Target },
 ]
@@ -53,10 +54,17 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       {/* Sidebar — desktop */}
-      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r bg-card">
+      <aside className="hidden md:flex w-56 shrink-0 flex-col border-r bg-card sticky top-0 h-screen overflow-y-auto">
         {/* Logo */}
         <div className="flex items-center gap-2 px-5 py-5 border-b">
-          <img src="/finus.svg" height={32} alt="Finus" style={{ height: 32 }} />
+          <Link href="/">
+            <img src="/finus.svg" height={32} alt="Finus" style={{ height: 32 }} />
+          </Link>
+        </div>
+
+        {/* CTA Registrar gasto */}
+        <div className="px-3 pt-3 pb-1">
+          <SidebarRegistrarGastoButton cuentas={cuentas} tarjetas={tarjetas} />
         </div>
 
         {/* Nav */}
@@ -97,7 +105,9 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
         <header className="md:hidden flex items-center justify-between border-b bg-card px-4 py-3">
-          <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
+          <Link href="/">
+            <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
+          </Link>
           <Link href="/configuracion" className="p-1 text-muted-foreground hover:text-foreground">
             <Settings className="size-5" />
           </Link>

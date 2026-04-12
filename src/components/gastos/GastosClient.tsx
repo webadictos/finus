@@ -194,8 +194,8 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: 
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Transacciones
         </h2>
-        <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
-          <Plus className="size-3.5" />
+        <Button onClick={() => setFormOpen(true)}>
+          <Plus className="size-4" />
           Registrar gasto
         </Button>
       </div>
