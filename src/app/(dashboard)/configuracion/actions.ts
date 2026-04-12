@@ -24,6 +24,17 @@ export async function actualizarPerfil(formData: FormData): Promise<ActionResult
   return {}
 }
 
+export async function cambiarPassword(nuevaPassword: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await supabase.auth.updateUser({ password: nuevaPassword })
+  if (error) return { error: error.message }
+
+  return {}
+}
+
 export async function resetearDatos(): Promise<ActionResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

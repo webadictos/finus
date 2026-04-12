@@ -6,7 +6,7 @@ import { LogOut, AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { actualizarPerfil, resetearDatos } from '@/app/(dashboard)/configuracion/actions'
+import { actualizarPerfil, cambiarPassword, resetearDatos } from '@/app/(dashboard)/configuracion/actions'
 import { logoutAction } from '@/app/(auth)/actions'
 
 interface Props {
@@ -30,6 +30,37 @@ export default function ConfiguracionClient({ nombre, email }: Props) {
         setPerfilMsg({ tipo: 'error', texto: result.error })
       } else {
         setPerfilMsg({ tipo: 'ok', texto: 'Perfil actualizado correctamente.' })
+      }
+    })
+  }
+
+  // ── Seguridad ────────────────────────────────────────────────────────────────
+  const [passNueva, setPassNueva] = useState('')
+  const [passConfirm, setPassConfirm] = useState('')
+  const [passMsg, setPassMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
+  const [passPending, startPassTransition] = useTransition()
+
+  const handleCambiarPassword = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setPassMsg(null)
+
+    if (passNueva.length < 8) {
+      setPassMsg({ tipo: 'error', texto: 'La contraseña debe tener al menos 8 caracteres.' })
+      return
+    }
+    if (passNueva !== passConfirm) {
+      setPassMsg({ tipo: 'error', texto: 'Las contraseñas no coinciden.' })
+      return
+    }
+
+    startPassTransition(async () => {
+      const result = await cambiarPassword(passNueva)
+      if (result.error) {
+        setPassMsg({ tipo: 'error', texto: result.error })
+      } else {
+        setPassMsg({ tipo: 'ok', texto: 'Contraseña actualizada correctamente.' })
+        setPassNueva('')
+        setPassConfirm('')
       }
     })
   }
@@ -118,6 +149,61 @@ export default function ConfiguracionClient({ nombre, email }: Props) {
         <div className="rounded-xl border bg-muted/40 px-4 py-5 text-sm text-muted-foreground text-center">
           Próximamente
         </div>
+      </section>
+
+      <div className="border-t" />
+
+      {/* ── Seguridad ── */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-semibold">Seguridad</h2>
+          <p className="text-sm text-muted-foreground">Cambia tu contraseña de acceso</p>
+        </div>
+
+        <form onSubmit={handleCambiarPassword} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pass-nueva">Nueva contraseña</Label>
+            <Input
+              id="pass-nueva"
+              type="password"
+              placeholder="Mínimo 8 caracteres"
+              autoComplete="new-password"
+              value={passNueva}
+              onChange={(e) => setPassNueva(e.target.value)}
+              required
+              minLength={8}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pass-confirm">Confirmar contraseña</Label>
+            <Input
+              id="pass-confirm"
+              type="password"
+              placeholder="Repite la nueva contraseña"
+              autoComplete="new-password"
+              value={passConfirm}
+              onChange={(e) => setPassConfirm(e.target.value)}
+              required
+            />
+          </div>
+
+          {passMsg && (
+            <p
+              className={`rounded-md px-3 py-2 text-sm ${
+                passMsg.tipo === 'ok'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-destructive/10 text-destructive'
+              }`}
+            >
+              {passMsg.texto}
+            </p>
+          )}
+
+          <Button type="submit" disabled={passPending} className="self-start">
+            {passPending ? 'Actualizando…' : 'Cambiar contraseña'}
+          </Button>
+        </form>
       </section>
 
       <div className="border-t" />
