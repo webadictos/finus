@@ -82,6 +82,7 @@ CREATE TABLE cargos_linea (
   saldo_pendiente         NUMERIC     NOT NULL,     -- revolvente: saldo actual
   tasa_efectiva_anual     NUMERIC     DEFAULT 0,
   notas                   TEXT,
+  fecha_compra            DATE,
   activo                  BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -190,3 +191,7 @@ BEGIN
   RETURN v_msi_total + v_revolvente;
 END;
 $$;
+
+-- ── 10. Columnas añadidas post-migración inicial ─────────────
+-- Ya ejecutadas en Supabase; incluidas aquí para tener el historial completo.
+ALTER TABLE cargos_linea ADD COLUMN IF NOT EXISTS fecha_compra DATE;

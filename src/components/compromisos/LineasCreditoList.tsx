@@ -2,6 +2,7 @@
 
 import { CreditCard } from 'lucide-react'
 import LineaCreditoCard from '@/components/compromisos/LineaCreditoCard'
+import NuevaLineaButton from '@/components/compromisos/NuevaLineaButton'
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
 
@@ -16,18 +17,6 @@ interface Props {
 }
 
 export default function LineasCreditoList({ lineas, cargos, cuentas }: Props) {
-  if (lineas.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-12 text-center">
-        <CreditCard className="size-8 text-muted-foreground" />
-        <p className="text-sm font-medium">Sin líneas de crédito registradas</p>
-        <p className="text-xs text-muted-foreground">
-          Las tarjetas de crédito y líneas digitales aparecerán aquí
-        </p>
-      </div>
-    )
-  }
-
   const totalMinimo = lineas.reduce(
     (sum, l) => sum + Number(l.pago_minimo ?? 0),
     0
@@ -39,6 +28,24 @@ export default function LineasCreditoList({ lineas, cargos, cuentas }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Encabezado con botón */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Líneas de crédito
+        </h2>
+        <NuevaLineaButton />
+      </div>
+
+      {lineas.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-12 text-center">
+          <CreditCard className="size-8 text-muted-foreground" />
+          <p className="text-sm font-medium">Sin líneas de crédito registradas</p>
+          <p className="text-xs text-muted-foreground">
+            Las tarjetas de crédito y líneas digitales aparecerán aquí
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Resumen */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border bg-card px-4 py-3 flex flex-col gap-1">
@@ -58,16 +65,18 @@ export default function LineasCreditoList({ lineas, cargos, cuentas }: Props) {
       </div>
 
       {/* Tarjetas */}
-      <div className="flex flex-col gap-3">
-        {lineas.map((linea) => (
-          <LineaCreditoCard
-            key={linea.id}
-            linea={linea}
-            cargos={cargos.filter((c) => c.linea_credito_id === linea.id)}
-            cuentas={cuentas}
-          />
-        ))}
-      </div>
+          <div className="flex flex-col gap-3">
+            {lineas.map((linea) => (
+              <LineaCreditoCard
+                key={linea.id}
+                linea={linea}
+                cargos={cargos.filter((c) => c.linea_credito_id === linea.id)}
+                cuentas={cuentas}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -676,6 +676,7 @@ export interface Database {
           saldo_pendiente: number
           tasa_efectiva_anual: number | null
           notas: string | null
+          fecha_compra: string | null
           activo: boolean
           created_at: string
           updated_at: string
@@ -693,6 +694,7 @@ export interface Database {
           saldo_pendiente: number
           tasa_efectiva_anual?: number | null
           notas?: string | null
+          fecha_compra?: string | null
           activo?: boolean
           created_at?: string
           updated_at?: string
@@ -710,6 +712,7 @@ export interface Database {
           saldo_pendiente?: number
           tasa_efectiva_anual?: number | null
           notas?: string | null
+          fecha_compra?: string | null
           activo?: boolean
           updated_at?: string
         }

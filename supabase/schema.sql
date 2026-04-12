@@ -428,6 +428,7 @@ CREATE TABLE cargos_linea (
   saldo_pendiente         NUMERIC     NOT NULL,
   tasa_efectiva_anual     NUMERIC     DEFAULT 0,
   notas                   TEXT,
+  fecha_compra            DATE,
   -- ⚠️ activo (masculino), NO activa
   activo                  BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),

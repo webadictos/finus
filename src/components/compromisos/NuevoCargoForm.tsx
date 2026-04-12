@@ -6,6 +6,7 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatMXN } from '@/lib/format'
 import { crearCargoLinea } from '@/app/(dashboard)/compromisos/actions'
 
 type TipoCargo = 'revolvente' | 'msi' | 'disposicion_efectivo'
@@ -19,16 +20,15 @@ interface Props {
 
 const TIPO_LABEL: Record<TipoCargo, string> = {
   revolvente: 'Revolvente',
-  msi: 'Meses sin intereses (MSI)',
-  disposicion_efectivo: 'Disposición en efectivo',
+  msi: 'MSI — Meses sin intereses',
+  disposicion_efectivo: 'Disposición de efectivo',
 }
 
 export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombre }: Props) {
   const [tipo, setTipo] = useState<TipoCargo>('revolvente')
   const [montoOriginal, setMontoOriginal] = useState('')
   const [mensualidades, setMensualidades] = useState('')
-  const [mensualidad, setMensualidad] = useState('')
-  const [mensualidadEditada, setMensualidadEditada] = useState(false)
+  const [mensualidadOverride, setMensualidadOverride] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -37,49 +37,36 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
       setTipo('revolvente')
       setMontoOriginal('')
       setMensualidades('')
-      setMensualidad('')
-      setMensualidadEditada(false)
+      setMensualidadOverride('')
       setError(null)
     }
     onOpenChange(next)
   }
 
-  // Auto-calcular mensualidad cuando cambia monto_original o mensualidades_totales
-  const recalcularMensualidad = (monto: string, meses: string) => {
-    if (mensualidadEditada) return
-    const m = parseFloat(monto)
-    const n = parseInt(meses)
-    if (!isNaN(m) && m > 0 && !isNaN(n) && n > 0) {
-      setMensualidad(String(Math.ceil((m / n) * 100) / 100))
-    }
-  }
-
-  const handleMontoChange = (val: string) => {
-    setMontoOriginal(val)
-    recalcularMensualidad(val, mensualidades)
-  }
-
-  const handleMesesChange = (val: string) => {
-    setMensualidades(val)
-    recalcularMensualidad(montoOriginal, val)
-  }
-
-  const handleMensualidadChange = (val: string) => {
-    setMensualidad(val)
-    setMensualidadEditada(true)
-  }
-
   const handleTipoChange = (val: TipoCargo) => {
     setTipo(val)
     setMensualidades('')
-    setMensualidad('')
-    setMensualidadEditada(false)
+    setMensualidadOverride('')
   }
+
+  // Valor calculado automáticamente
+  const monto = parseFloat(montoOriginal)
+  const meses = parseInt(mensualidades)
+  const mensualidadCalc =
+    !isNaN(monto) && monto > 0 && !isNaN(meses) && meses > 0
+      ? monto / meses
+      : null
+
+  const tieneInstalamentos = tipo === 'msi' || tipo === 'disposicion_efectivo'
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
     const fd = new FormData(e.currentTarget)
+    // Si el usuario no editó la mensualidad, inyectar el valor calculado
+    if (tieneInstalamentos && !mensualidadOverride && mensualidadCalc) {
+      fd.set('monto_mensualidad', String(mensualidadCalc))
+    }
 
     startTransition(async () => {
       const result = await crearCargoLinea(lineaId, fd)
@@ -90,8 +77,6 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
       }
     })
   }
-
-  const tieneInstalamentos = tipo === 'msi' || tipo === 'disposicion_efectivo'
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
@@ -118,13 +103,25 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="flex flex-col gap-5 overflow-y-auto px-5 py-5 flex-1">
-            {/* Nombre */}
+            {/* Descripción */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="nombre">Descripción del cargo</Label>
+              <Label htmlFor="nombre">Descripción</Label>
               <Input
                 id="nombre"
                 name="nombre"
-                placeholder="ej. Amazon Prime 12 meses"
+                placeholder="ej. ropa Liverpool"
+                required
+              />
+            </div>
+
+            {/* Fecha de compra */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fecha_compra">Fecha de compra</Label>
+              <Input
+                id="fecha_compra"
+                name="fecha_compra"
+                type="date"
+                defaultValue={new Date().toISOString().split('T')[0]}
                 required
               />
             </div>
@@ -155,7 +152,11 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
             {/* Monto original */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="monto_original">
-                {tipo === 'revolvente' ? 'Saldo pendiente actual' : 'Monto total del cargo'}
+                {tipo === 'revolvente'
+                  ? '¿Cuánto cargaste?'
+                  : tipo === 'disposicion_efectivo'
+                  ? '¿Cuánto dispusiste?'
+                  : '¿Cuánto fue la compra?'}
               </Label>
               <Input
                 id="monto_original"
@@ -165,18 +166,18 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
                 step="0.01"
                 placeholder="0.00"
                 value={montoOriginal}
-                onChange={(e) => handleMontoChange(e.target.value)}
+                onChange={(e) => setMontoOriginal(e.target.value)}
                 required
               />
             </div>
 
-            {/* Campos de instalamentos — MSI y disposicion_efectivo */}
+            {/* Campos de instalamentos — MSI y disposición */}
             {tieneInstalamentos && (
               <>
-                <div className="flex gap-3">
-                  {/* Mensualidades totales */}
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <Label htmlFor="mensualidades_totales">Meses totales</Label>
+                {/* Meses */}
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="mensualidades_totales">¿A cuántos meses?</Label>
+                  <div className="flex gap-2">
                     <Input
                       id="mensualidades_totales"
                       name="mensualidades_totales"
@@ -185,49 +186,46 @@ export default function NuevoCargoForm({ open, onOpenChange, lineaId, lineaNombr
                       step="1"
                       placeholder="12"
                       value={mensualidades}
-                      onChange={(e) => handleMesesChange(e.target.value)}
+                      onChange={(e) => setMensualidades(e.target.value)}
+                      className="flex-1"
+                      required
                     />
+                    {tipo === 'disposicion_efectivo' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 text-xs"
+                        onClick={() => setMensualidades('1')}
+                      >
+                        De contado
+                      </Button>
+                    )}
                   </div>
-
-                  {/* Mensualidad */}
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <Label htmlFor="monto_mensualidad">
-                      Pago mensual
-                      {!mensualidadEditada && mensualidad && (
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          (calculado)
-                        </span>
-                      )}
-                    </Label>
-                    <Input
-                      id="monto_mensualidad"
-                      name="monto_mensualidad"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={mensualidad}
-                      onChange={(e) => handleMensualidadChange(e.target.value)}
-                    />
-                  </div>
+                  {mensualidadCalc && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ {formatMXN(mensualidadCalc)} / mes
+                    </p>
+                  )}
                 </div>
 
-                {/* Tasa efectiva anual */}
+                {/* Mensualidad (override opcional) */}
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="tasa_efectiva_anual">
-                    Tasa efectiva anual (%)
+                  <Label htmlFor="monto_mensualidad">
+                    Mensualidad
                     <span className="ml-1 text-xs font-normal text-muted-foreground">
-                      — 0 si es sin intereses
+                      — edita si el banco redondea diferente
                     </span>
                   </Label>
                   <Input
-                    id="tasa_efectiva_anual"
-                    name="tasa_efectiva_anual"
+                    id="monto_mensualidad"
+                    name="monto_mensualidad"
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
-                    placeholder="0"
-                    defaultValue="0"
+                    placeholder={mensualidadCalc ? String(mensualidadCalc.toFixed(2)) : '0.00'}
+                    value={mensualidadOverride}
+                    onChange={(e) => setMensualidadOverride(e.target.value)}
                   />
                 </div>
               </>

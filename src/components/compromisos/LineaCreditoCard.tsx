@@ -194,6 +194,11 @@ export default function LineaCreditoCard({ linea, cargos, cuentas }: Props) {
                         {formatMXN(Number(cargo.saldo_pendiente ?? 0))}
                       </span>
                     )}
+                    {cargo.fecha_compra && (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {cargo.fecha_compra.slice(8, 10)}/{cargo.fecha_compra.slice(5, 7)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))

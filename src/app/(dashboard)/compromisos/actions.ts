@@ -14,6 +14,80 @@ export type MarcarPagadoResult = {
   monto?: number
 }
 
+export async function crearLineaCredito(
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const nombre = (formData.get('nombre') as string).trim()
+  if (!nombre) return { error: 'El nombre es requerido' }
+
+  const tipo = formData.get('tipo') as 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
+  const titular_tipo = (formData.get('titular_tipo') as string | null) || 'personal'
+  const banco = (formData.get('banco') as string | null)?.trim() || null
+  const titular_nombre = (formData.get('titular_nombre') as string | null)?.trim() || null
+  const ultimos_4 = (formData.get('ultimos_4') as string | null)?.trim() || null
+
+  const rawLimite = parseFloat(formData.get('limite_credito') as string)
+  const rawCorte = parseFloat(formData.get('saldo_al_corte') as string)
+  const rawPSI = parseFloat(formData.get('pago_sin_intereses') as string)
+  const rawMin = parseFloat(formData.get('pago_minimo') as string)
+  const rawDiaCorte = parseInt(formData.get('dia_corte') as string)
+  const rawDiaLimite = parseInt(formData.get('dia_limite_pago') as string)
+  const rawTasa = parseFloat(formData.get('tasa_interes_anual') as string)
+
+  const limite_credito = isNaN(rawLimite) ? null : rawLimite
+  const saldo_al_corte = isNaN(rawCorte) ? null : rawCorte
+  const pago_sin_intereses = isNaN(rawPSI) ? null : rawPSI
+  const pago_minimo = isNaN(rawMin) ? null : rawMin
+  const dia_corte = isNaN(rawDiaCorte) ? null : rawDiaCorte
+  const dia_limite_pago = isNaN(rawDiaLimite) ? null : rawDiaLimite
+  const tasa_interes_anual = isNaN(rawTasa) ? null : rawTasa
+
+  // Calcular fecha_proximo_pago desde dia_limite_pago
+  let fecha_proximo_pago: string | null = null
+  if (dia_limite_pago != null) {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = today.getMonth() // 0-based
+    const day = today.getDate()
+
+    // Si el día límite ya pasó este mes, usar el mes siguiente
+    const targetMonth = day >= dia_limite_pago ? month + 1 : month
+    const target = new Date(year, targetMonth, dia_limite_pago)
+    fecha_proximo_pago = target.toISOString().split('T')[0]
+  }
+
+  const { error } = await supabase.from('lineas_credito').insert({
+    usuario_id: user.id,
+    nombre,
+    banco,
+    tipo,
+    titular_tipo: titular_tipo as 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero',
+    titular_nombre,
+    ultimos_4,
+    limite_credito,
+    saldo_actual: saldo_al_corte ?? 0,
+    saldo_al_corte,
+    pago_sin_intereses,
+    pago_minimo,
+    fecha_proximo_pago,
+    dia_corte,
+    dia_limite_pago,
+    tasa_interes_anual,
+    activa: true,
+  })
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
 export async function crearCargoLinea(
   lineaId: string,
   formData: FormData
@@ -27,9 +101,10 @@ export async function crearCargoLinea(
   const nombre = (formData.get('nombre') as string).trim()
   const tipo = formData.get('tipo') as 'revolvente' | 'msi' | 'disposicion_efectivo'
   const monto_original = parseFloat(formData.get('monto_original') as string)
+  const fecha_compra = (formData.get('fecha_compra') as string | null) || null
 
   if (!nombre) return { error: 'El nombre es requerido' }
-  if (isNaN(monto_original) || monto_original <= 0) return { error: 'El monto original es requerido' }
+  if (isNaN(monto_original) || monto_original <= 0) return { error: 'El monto es requerido' }
 
   let saldo_pendiente: number
   let mensualidades_totales: number | null = null
@@ -43,18 +118,33 @@ export async function crearCargoLinea(
     // msi | disposicion_efectivo
     const rawMeses = parseInt(formData.get('mensualidades_totales') as string)
     const rawMensualidad = parseFloat(formData.get('monto_mensualidad') as string)
-    const rawTasa = parseFloat(formData.get('tasa_efectiva_anual') as string)
 
     mensualidades_totales = isNaN(rawMeses) || rawMeses <= 0 ? null : rawMeses
-    monto_mensualidad = isNaN(rawMensualidad) || rawMensualidad <= 0 ? null : rawMensualidad
-    tasa_efectiva_anual = isNaN(rawTasa) ? 0 : rawTasa
+    // Usar override del usuario si lo proporcionó; si no, calcular desde monto/meses
+    if (!isNaN(rawMensualidad) && rawMensualidad > 0) {
+      monto_mensualidad = rawMensualidad
+    } else if (mensualidades_totales) {
+      monto_mensualidad = monto_original / mensualidades_totales
+    }
     mensualidades_restantes = mensualidades_totales
 
-    // saldo_pendiente = mensualidad × meses restantes, o monto_original como fallback
     saldo_pendiente =
       monto_mensualidad != null && mensualidades_totales != null
         ? monto_mensualidad * mensualidades_totales
         : monto_original
+
+    if (tipo === 'msi') {
+      tasa_efectiva_anual = 0
+    } else {
+      // disposicion_efectivo: tomar tasa de la línea / 12
+      const { data: linea } = await supabase
+        .from('lineas_credito')
+        .select('tasa_interes_anual')
+        .eq('id', lineaId)
+        .single()
+      const tasaAnual = linea?.tasa_interes_anual != null ? Number(linea.tasa_interes_anual) : 0
+      tasa_efectiva_anual = tasaAnual / 12
+    }
   }
 
   const { error } = await supabase.from('cargos_linea').insert({
@@ -68,6 +158,7 @@ export async function crearCargoLinea(
     mensualidades_restantes,
     saldo_pendiente,
     tasa_efectiva_anual,
+    fecha_compra,
     activo: true,
   })
 
