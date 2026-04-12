@@ -765,3 +765,285 @@ export async function deshacerMarcarPagado(
   revalidatePath('/')
   return {}
 }
+
+// ─── Obtener liquidez ─────────────────────────────────────────────────────────
+
+export async function registrarDisposicionEfectivo(
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const lineaId = formData.get('linea_credito_id') as string
+  const monto = parseFloat(formData.get('monto') as string)
+  const rawMensualidades = parseInt(formData.get('mensualidades_totales') as string)
+  const rawOverride = parseFloat(formData.get('monto_mensualidad') as string)
+  const cuentaDestinoId = (formData.get('cuenta_destino_id') as string) || null
+  const nombre = ((formData.get('nombre') as string) || '').trim() || 'Disposición de efectivo'
+
+  if (!lineaId) return { error: 'Selecciona una línea de crédito' }
+  if (isNaN(monto) || monto <= 0) return { error: 'Ingresa un monto válido' }
+
+  const mensualidades_totales = isNaN(rawMensualidades) || rawMensualidades < 1 ? 1 : rawMensualidades
+
+  // Obtener tasa de la línea (tasa_efectiva_anual = tasa_anual / 12)
+  const { data: linea } = await supabase
+    .from('lineas_credito')
+    .select('tasa_interes_anual')
+    .eq('id', lineaId)
+    .single()
+  const tasaAnual = linea?.tasa_interes_anual != null ? Number(linea.tasa_interes_anual) : 0
+  const tasa_efectiva_anual = tasaAnual / 12
+
+  const monto_mensualidad =
+    !isNaN(rawOverride) && rawOverride > 0
+      ? rawOverride
+      : monto / mensualidades_totales
+  const saldo_pendiente = monto_mensualidad * mensualidades_totales
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 1. INSERT cargos_linea
+  const { error: cargoError } = await supabase.from('cargos_linea').insert({
+    linea_credito_id: lineaId,
+    usuario_id: user.id,
+    nombre,
+    tipo: 'disposicion_efectivo',
+    monto_original: monto,
+    monto_mensualidad,
+    mensualidades_totales,
+    mensualidades_restantes: mensualidades_totales,
+    saldo_pendiente,
+    tasa_efectiva_anual,
+    fecha_compra: hoy,
+    activo: true,
+  })
+  if (cargoError) return { error: cargoError.message }
+
+  // 2. Incrementar saldo de cuenta destino
+  if (cuentaDestinoId) {
+    await supabase.rpc('incrementar_saldo', { p_cuenta_id: cuentaDestinoId, p_monto: monto })
+  }
+
+  // 3. INSERT transacciones
+  await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    tipo: 'ingreso' as const,
+    monto,
+    fecha: hoy,
+    descripcion: nombre,
+    cuenta_id: cuentaDestinoId,
+    forma_pago: 'disposicion_efectivo',
+    es_recurrente: false,
+  })
+
+  revalidatePath('/')
+  revalidatePath('/compromisos')
+  return {}
+}
+
+export async function registrarPrestamoPersonal(
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const prestamista = ((formData.get('prestamista') as string) || '').trim()
+  const montoRecibido = parseFloat(formData.get('monto_recibido') as string)
+  const rawDevolucion = parseFloat(formData.get('monto_devolucion') as string)
+  const comoDevuelves = formData.get('como_devuelves') as 'unico' | 'varios'
+  const cuentaDestinoId = (formData.get('cuenta_destino_id') as string) || null
+
+  if (!prestamista) return { error: 'Indica quién te presta' }
+  if (isNaN(montoRecibido) || montoRecibido <= 0) return { error: 'Ingresa un monto recibido válido' }
+  const montoDevolucion = isNaN(rawDevolucion) || rawDevolucion <= 0 ? montoRecibido : rawDevolucion
+
+  const hoy = new Date()
+  const hoyStr = hoy.toISOString().split('T')[0]
+
+  // 1. Incrementar saldo
+  if (cuentaDestinoId) {
+    await supabase.rpc('incrementar_saldo', { p_cuenta_id: cuentaDestinoId, p_monto: montoRecibido })
+  }
+
+  // 2. INSERT transacciones
+  await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    tipo: 'ingreso' as const,
+    monto: montoRecibido,
+    fecha: hoyStr,
+    descripcion: `Préstamo de ${prestamista}`,
+    cuenta_id: cuentaDestinoId,
+    forma_pago: 'prestamo',
+    es_recurrente: false,
+  })
+
+  // 3. Crear compromiso(s) de devolución
+  if (comoDevuelves === 'unico') {
+    const fechaDevolucion = (formData.get('fecha_devolucion') as string) || null
+    await supabase.from('compromisos').insert({
+      usuario_id: user.id,
+      nombre: `Devolución a ${prestamista}`,
+      tipo_pago: 'prestamo' as const,
+      monto_mensualidad: montoDevolucion,
+      fecha_proximo_pago: fechaDevolucion,
+      mensualidades_restantes: 1,
+      prioridad: 'alta' as const,
+      activo: true,
+    })
+  } else {
+    const rawNumPagos = parseInt(formData.get('num_pagos') as string)
+    const frecuencia = (formData.get('frecuencia') as 'semanal' | 'quincenal' | 'mensual') || 'mensual'
+    const numPagos = isNaN(rawNumPagos) || rawNumPagos < 1 ? 1 : rawNumPagos
+    const montoPorPago = montoDevolucion / numPagos
+
+    // Calcular primera fecha según frecuencia
+    const primerPago = new Date(hoy)
+    if (frecuencia === 'semanal') {
+      primerPago.setDate(primerPago.getDate() + 7)
+    } else if (frecuencia === 'quincenal') {
+      primerPago.setDate(primerPago.getDate() + 15)
+    } else {
+      primerPago.setMonth(primerPago.getMonth() + 1)
+    }
+    const fechaProximoPago = primerPago.toISOString().split('T')[0]
+
+    await supabase.from('compromisos').insert({
+      usuario_id: user.id,
+      nombre: `Devolución a ${prestamista}`,
+      tipo_pago: 'prestamo' as const,
+      monto_mensualidad: montoPorPago,
+      fecha_proximo_pago: fechaProximoPago,
+      mensualidades_restantes: numPagos,
+      meses_totales: numPagos,
+      prioridad: 'alta' as const,
+      activo: true,
+    })
+  }
+
+  revalidatePath('/')
+  revalidatePath('/compromisos')
+  return {}
+}
+
+// ─── Préstamos dados ─────────────────────────────────────────────────────────
+
+export async function registrarPrestamoDado(
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const deudor = ((formData.get('deudor') as string) || '').trim()
+  const montoPrestado = parseFloat(formData.get('monto_prestado') as string)
+  const rawRecuperar = parseFloat(formData.get('monto_a_recuperar') as string)
+  const fechaDevolucion = (formData.get('fecha_devolucion') as string) || null
+  const cuentaOrigenId = (formData.get('cuenta_origen_id') as string) || null
+  const notas = ((formData.get('notas') as string) || '').trim() || null
+
+  if (!deudor) return { error: 'Indica el nombre del deudor' }
+  if (isNaN(montoPrestado) || montoPrestado <= 0) return { error: 'Ingresa un monto válido' }
+  const montoARecuperar = isNaN(rawRecuperar) || rawRecuperar <= 0 ? montoPrestado : rawRecuperar
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 1. INSERT prestamos_dados
+  const { error: insertError } = await supabase.from('prestamos_dados').insert({
+    usuario_id: user.id,
+    deudor,
+    monto_prestado: montoPrestado,
+    monto_a_recuperar: montoARecuperar,
+    fecha_prestamo: hoy,
+    fecha_devolucion: fechaDevolucion,
+    monto_recuperado: 0,
+    estado: 'pendiente' as const,
+    notas,
+    cuenta_origen_id: cuentaOrigenId,
+    activo: true,
+  })
+  if (insertError) return { error: insertError.message }
+
+  // 2. Decrementar saldo de cuenta origen
+  if (cuentaOrigenId) {
+    await supabase.rpc('decrementar_saldo', { p_cuenta_id: cuentaOrigenId, p_monto: montoPrestado })
+  }
+
+  // 3. INSERT transacciones
+  await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    tipo: 'gasto' as const,
+    monto: montoPrestado,
+    fecha: hoy,
+    descripcion: `Préstamo a ${deudor}`,
+    categoria: 'prestamo_dado',
+    cuenta_id: cuentaOrigenId,
+    es_recurrente: false,
+  })
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
+export async function registrarAbonoPrestamoDado(
+  prestamoId: string,
+  montoAbono: number,
+  cuentaId: string | null
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { data: prestamo, error: fetchError } = await supabase
+    .from('prestamos_dados')
+    .select('deudor, monto_a_recuperar, monto_recuperado')
+    .eq('id', prestamoId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchError || !prestamo) return { error: 'Préstamo no encontrado' }
+
+  const nuevoRecuperado = Number(prestamo.monto_recuperado) + montoAbono
+  const totalRecuperar = Number(prestamo.monto_a_recuperar)
+  const nuevoEstado: 'parcial' | 'recuperado' =
+    nuevoRecuperado >= totalRecuperar ? 'recuperado' : 'parcial'
+
+  // 1. UPDATE prestamos_dados
+  const { error: updateError } = await supabase
+    .from('prestamos_dados')
+    .update({ monto_recuperado: nuevoRecuperado, estado: nuevoEstado })
+    .eq('id', prestamoId)
+    .eq('usuario_id', user.id)
+
+  if (updateError) return { error: updateError.message }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 2. Incrementar saldo si se especificó cuenta
+  if (cuentaId) {
+    await supabase.rpc('incrementar_saldo', { p_cuenta_id: cuentaId, p_monto: montoAbono })
+  }
+
+  // 3. INSERT transacciones
+  await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    tipo: 'ingreso' as const,
+    monto: montoAbono,
+    fecha: hoy,
+    descripcion: `Abono de ${prestamo.deudor}`,
+    cuenta_id: cuentaId,
+    es_recurrente: false,
+  })
+
+  revalidatePath('/compromisos')
+  return {}
+}

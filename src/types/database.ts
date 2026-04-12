@@ -753,6 +753,56 @@ export interface Database {
         }
         Relationships: Rel[]
       }
+      prestamos_dados: {
+        Row: {
+          id: string
+          usuario_id: string
+          deudor: string
+          monto_prestado: number
+          monto_a_recuperar: number
+          fecha_prestamo: string
+          fecha_devolucion: string | null
+          monto_recuperado: number
+          estado: 'pendiente' | 'parcial' | 'recuperado' | 'incobrable'
+          notas: string | null
+          cuenta_origen_id: string | null
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          deudor: string
+          monto_prestado: number
+          monto_a_recuperar: number
+          fecha_prestamo?: string
+          fecha_devolucion?: string | null
+          monto_recuperado?: number
+          estado?: 'pendiente' | 'parcial' | 'recuperado' | 'incobrable'
+          notas?: string | null
+          cuenta_origen_id?: string | null
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          deudor?: string
+          monto_prestado?: number
+          monto_a_recuperar?: number
+          fecha_prestamo?: string
+          fecha_devolucion?: string | null
+          monto_recuperado?: number
+          estado?: 'pendiente' | 'parcial' | 'recuperado' | 'incobrable'
+          notas?: string | null
+          cuenta_origen_id?: string | null
+          activo?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
       metas: {
         Row: {
           id: string

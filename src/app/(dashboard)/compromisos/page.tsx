@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils'
 import CompromisoCard from '@/components/compromisos/CompromisoCard'
 import NuevoCompromisoButton from '@/components/compromisos/NuevoCompromisoButton'
 import LineasCreditoList from '@/components/compromisos/LineasCreditoList'
+import PrestamoDadosSection from '@/components/compromisos/PrestamoDadosSection'
 import type { Database } from '@/types/database'
 
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type LineaCredito = Database['public']['Tables']['lineas_credito']['Row']
 type CargoLinea = Database['public']['Tables']['cargos_linea']['Row']
+type PrestamoDado = Database['public']['Tables']['prestamos_dados']['Row']
 
 export default async function CompromisosPage({
   searchParams,
@@ -30,6 +32,7 @@ export default async function CompromisosPage({
     pagosRes,
     ingresosRes,
     acuerdosRes,
+    prestamosRes,
   ] = await Promise.all([
     supabase
       .from('cuentas')
@@ -68,6 +71,12 @@ export default async function CompromisosPage({
       .select('*')
       .eq('activo', true)
       .eq('estado', 'activo'),
+    supabase
+      .from('prestamos_dados')
+      .select('*')
+      .eq('activo', true)
+      .neq('estado', 'recuperado')
+      .order('fecha_devolucion', { ascending: true, nullsFirst: false }),
   ])
 
   const lineas: LineaCredito[] = lineasRes.data ?? []
@@ -75,6 +84,7 @@ export default async function CompromisosPage({
   const compromisos: Compromiso[] = compromisosRes.data ?? []
   const cuentas = cuentasRes.data ?? []
   const acuerdos = acuerdosRes.data ?? []
+  const prestamos: PrestamoDado[] = prestamosRes.data ?? []
 
   // Saldo disponible para recomendaciones en Tab 2
   const ingresosSinCuenta = (ingresosRes.data ?? []).reduce(
@@ -176,6 +186,12 @@ export default async function CompromisosPage({
               </div>
             </>
           )}
+
+          {/* Sección: dinero que te deben */}
+          <PrestamoDadosSection
+            prestamos={prestamos}
+            cuentas={cuentas}
+          />
         </div>
       )}
     </div>
