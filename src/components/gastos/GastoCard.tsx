@@ -123,6 +123,15 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
               <span>·</span>
               <span>{fechaDisplay}</span>
             </div>
+            {(transaccion as typeof transaccion & { etiquetas?: string[] | null }).etiquetas?.length ? (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {(transaccion as typeof transaccion & { etiquetas?: string[] | null }).etiquetas!.map((tag) => (
+                  <span key={tag} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 

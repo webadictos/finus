@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { crearIngreso, actualizarIngreso } from '@/app/(dashboard)/ingresos/actions'
+import MontoInput from '@/components/ui/MontoInput'
 import type { Database } from '@/types/database'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
@@ -181,14 +182,10 @@ export default function IngresoForm({ open, onOpenChange, ingreso, cuentas }: Pr
               {/* Monto esperado */}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="monto_esperado">Monto esperado</Label>
-                <Input
+                <MontoInput
                   id="monto_esperado"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
                   value={form.monto_esperado}
-                  onChange={set('monto_esperado')}
+                  onChange={(val) => setForm((p) => ({ ...p, monto_esperado: val }))}
                   required
                 />
               </div>
