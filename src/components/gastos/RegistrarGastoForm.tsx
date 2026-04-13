@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
 import MontoInput from '@/components/ui/MontoInput'
+import TagInput from '@/components/ui/TagInput'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
 
@@ -48,6 +49,7 @@ interface FormState {
   meses_msi: string
   fecha: string
   notas: string
+  etiquetas: string[]
 }
 
 function todayISO() {
@@ -69,6 +71,7 @@ function initialForm(tx?: Transaccion | null): FormState {
       meses_msi: '',
       fecha: todayISO(),
       notas: '',
+      etiquetas: [],
     }
   }
   return {
@@ -81,6 +84,7 @@ function initialForm(tx?: Transaccion | null): FormState {
     meses_msi: tx.meses_msi != null ? String(tx.meses_msi) : '',
     fecha: tx.fecha.slice(0, 10),
     notas: tx.notas ?? '',
+    etiquetas: (tx as Transaccion & { etiquetas?: string[] | null }).etiquetas ?? [],
   }
 }
 
@@ -89,6 +93,8 @@ interface Props {
   onOpenChange: (open: boolean) => void
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  /** Etiquetas existentes para sugerir en autocomplete */
+  etiquetasSugeridas?: string[]
   /** Si se pasa, el form entra en modo edición */
   transaccion?: Transaccion | null
   /** Llamado tras guardar exitosamente un nuevo gasto */
@@ -97,7 +103,7 @@ interface Props {
 
 const STORAGE_KEY_CUENTA = 'finus_cuenta_predeterminada'
 
-export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, transaccion, onSave }: Props) {
+export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, etiquetasSugeridas = [], transaccion, onSave }: Props) {
   const isEditing = !!transaccion
   const [form, setForm] = useState<FormState>(() => initialForm(transaccion))
   const [error, setError] = useState<string | null>(null)
@@ -136,7 +142,11 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
 
     const fd = new FormData()
     Object.entries(form).forEach(([k, v]) => {
-      if (v !== '') fd.append(k, v)
+      if (k === 'etiquetas') {
+        fd.append(k, JSON.stringify(v))
+      } else if (v !== '') {
+        fd.append(k, v as string)
+      }
     })
 
     // Validar que haya cuenta seleccionada cuando la forma de pago lo requiere
@@ -354,6 +364,15 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                     Estás registrando un gasto con fecha futura.
                   </p>
                 )}
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label>Etiquetas (opcional)</Label>
+                <TagInput
+                  value={form.etiquetas}
+                  onChange={(tags) => setForm((p) => ({ ...p, etiquetas: tags }))}
+                  sugerencias={etiquetasSugeridas}
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">

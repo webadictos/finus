@@ -71,9 +71,10 @@ interface Props {
   tarjetaNombre?: string | null
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  etiquetasSugeridas?: string[]
 }
 
-export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjetas }: Props) {
+export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjetas, etiquetasSugeridas = [] }: Props) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -143,6 +144,7 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
         onOpenChange={setEditOpen}
         cuentas={cuentas}
         tarjetas={tarjetas}
+        etiquetasSugeridas={etiquetasSugeridas}
         transaccion={transaccion}
       />
 

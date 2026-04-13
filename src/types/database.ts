@@ -405,6 +405,7 @@ export interface Database {
           meses_msi: number | null
           es_recurrente: boolean
           notas: string | null
+          etiquetas: string[] | null
           created_at: string
         }
         Insert: {
@@ -423,6 +424,7 @@ export interface Database {
           meses_msi?: number | null
           es_recurrente?: boolean
           notas?: string | null
+          etiquetas?: string[] | null
           created_at?: string
         }
         Update: {
@@ -441,6 +443,7 @@ export interface Database {
           meses_msi?: number | null
           es_recurrente?: boolean
           notas?: string | null
+          etiquetas?: string[] | null
         }
         Relationships: Rel[]
       }

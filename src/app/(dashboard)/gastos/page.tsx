@@ -26,7 +26,7 @@ export default async function GastosPage({ searchParams }: Props) {
   const lastDayDate = new Date(year, month, 0)
   const lastDay = `${mesFinal}-${String(lastDayDate.getDate()).padStart(2, '0')}`
 
-  const [transRes, cuentasRes, tarjetasRes] = await Promise.all([
+  const [transRes, cuentasRes, tarjetasRes, etiquetasRes] = await Promise.all([
     supabase
       .from('transacciones')
       .select('*')
@@ -48,7 +48,21 @@ export default async function GastosPage({ searchParams }: Props) {
       .eq('usuario_id', user.id)
       .eq('activa', true)
       .order('nombre', { ascending: true }),
+    supabase
+      .from('transacciones')
+      .select('etiquetas')
+      .eq('usuario_id', user.id)
+      .eq('tipo', 'gasto')
+      .not('etiquetas', 'is', null),
   ])
+
+  // Aplanar y deduplicar todas las etiquetas usadas
+  const etiquetasSugeridas = [
+    ...new Set(
+      (etiquetasRes.data ?? [])
+        .flatMap((t) => (t as { etiquetas: string[] | null }).etiquetas ?? [])
+    ),
+  ].sort()
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -64,6 +78,7 @@ export default async function GastosPage({ searchParams }: Props) {
         cuentas={cuentasRes.data ?? []}
         tarjetas={tarjetasRes.data ?? []}
         mes={mesFinal}
+        etiquetasSugeridas={etiquetasSugeridas}
       />
     </div>
   )

@@ -90,13 +90,14 @@ interface Props {
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
   mes: string
+  etiquetasSugeridas?: string[]
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 type Sugerencia = { previstos: PrevistoBasico[]; transaccionId: string }
 
-export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: Props) {
+export default function GastosClient({ transacciones, cuentas, tarjetas, mes, etiquetasSugeridas = [] }: Props) {
   const [formOpen, setFormOpen] = useState(false)
   const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null)
   const router = useRouter()
@@ -230,6 +231,7 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: 
                     tarjetaNombre={t.tarjeta_id ? tarjetasMap.get(t.tarjeta_id) : null}
                     cuentas={cuentas}
                     tarjetas={tarjetas}
+                    etiquetasSugeridas={etiquetasSugeridas}
                   />
                 ))}
               </div>
@@ -243,6 +245,7 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes }: 
         onOpenChange={setFormOpen}
         cuentas={cuentas}
         tarjetas={tarjetas}
+        etiquetasSugeridas={etiquetasSugeridas}
         onSave={handleSave}
       />
 

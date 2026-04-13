@@ -27,6 +27,12 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
 
   const monto = parseFloat(formData.get('monto') as string) || 0
 
+  let etiquetas: string[] | null = null
+  try {
+    const raw = formData.get('etiquetas') as string
+    if (raw) etiquetas = JSON.parse(raw)
+  } catch { /* ignorar */ }
+
   const { data: nuevaTx, error } = await supabase
     .from('transacciones')
     .insert({
@@ -41,6 +47,7 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
       tarjeta_id: ['credito_revolvente', 'msi'].includes(formaPago) ? tarjetaId : null,
       meses_msi: formaPago === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
       notas: ((formData.get('notas') as string) || '').trim() || null,
+      etiquetas: etiquetas && etiquetas.length > 0 ? etiquetas : null,
       es_recurrente: false,
     })
     .select('id')
@@ -107,6 +114,12 @@ export async function actualizarGasto(
     : null
   const mesesMsi = formData.get('meses_msi')
 
+  let etiquetasActualizar: string[] | null = null
+  try {
+    const raw = formData.get('etiquetas') as string
+    if (raw) etiquetasActualizar = JSON.parse(raw)
+  } catch { /* ignorar */ }
+
   // Actualizar la transacción
   const { error: updateErr } = await supabase
     .from('transacciones')
@@ -120,6 +133,7 @@ export async function actualizarGasto(
       tarjeta_id: tarjetaIdNueva,
       meses_msi: formaPagoNueva === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
       notas: ((formData.get('notas') as string) || '').trim() || null,
+      etiquetas: etiquetasActualizar && etiquetasActualizar.length > 0 ? etiquetasActualizar : null,
     })
     .eq('id', id)
     .eq('usuario_id', user.id)
