@@ -19,6 +19,10 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
     label: 'Confirmado',
     className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   },
+  esperado: {
+    label: 'Esperado',
+    className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  },
 }
 
 interface Props {
@@ -91,13 +95,19 @@ export default function ProximosIngresos({ ingresos, cuentas }: Props) {
                 <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                   {formatMXN(Number(ingreso.monto_esperado ?? 0))}
                 </span>
-                {ingreso.estado !== 'confirmado' && (
+                {ingreso.estado !== 'confirmado' && !ingreso.id.endsWith('_next') && (
                   <ConfirmarIngresoButton ingreso={ingreso} cuentas={cuentas} />
                 )}
               </div>
             </div>
           )
         })}
+      </div>
+
+      <div className="mt-3 pt-3 border-t">
+        <a href="/ingresos" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          Ver todos los ingresos →
+        </a>
       </div>
     </div>
   )

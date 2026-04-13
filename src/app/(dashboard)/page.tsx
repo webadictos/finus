@@ -5,7 +5,7 @@ import KPICards from '@/components/dashboard/KPICards'
 import AlertasVencimiento from '@/components/dashboard/AlertasVencimiento'
 import ProximosIngresos from '@/components/dashboard/ProximosIngresos'
 import ProximosGastosPrevistos from '@/components/dashboard/ProximosGastosPrevistos'
-import AconsejameButton from '@/components/dashboard/AconsejameButton'
+import CompromisosVencidos from '@/components/dashboard/CompromisosVencidos'
 import NuevaTransferenciaButton from '@/components/cuentas/NuevaTransferenciaButton'
 import ObtenerLiquidezButton from '@/components/dashboard/ObtenerLiquidezButton'
 import type { Database } from '@/types/database'
@@ -25,6 +25,35 @@ function CardSkeleton({ className = '' }: { className?: string }) {
       <div className="h-6 w-1/2 rounded bg-muted" />
     </div>
   )
+}
+
+/**
+ * Calcula la siguiente fecha de un ingreso recurrente confirmado.
+ * Devuelve null si no aplica.
+ */
+function calcularProximaFecha(ingreso: Ingreso): Date | null {
+  if (!ingreso.es_recurrente || !ingreso.frecuencia) return null
+  const baseStr = ingreso.fecha_real ?? ingreso.fecha_esperada
+  if (!baseStr) return null
+  const base = new Date(baseStr + 'T00:00:00')
+  const proxima = new Date(base)
+  switch (ingreso.frecuencia) {
+    case 'quincenal':
+      proxima.setDate(proxima.getDate() + 15)
+      break
+    case 'mensual':
+      proxima.setMonth(proxima.getMonth() + 1)
+      break
+    case 'semanal':
+      proxima.setDate(proxima.getDate() + 7)
+      break
+    case 'anual':
+      proxima.setFullYear(proxima.getFullYear() + 1)
+      break
+    default:
+      return null
+  }
+  return proxima
 }
 
 async function DashboardData() {
@@ -79,14 +108,56 @@ async function DashboardData() {
     .filter((c) => c.tipo !== 'inversion')
     .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0) + ingresosSinCuenta
 
+  // Generar instancias futuras para ingresos recurrentes confirmados
+  // cuya siguiente ocurrencia aún no existe en la DB y cae en los próximos 30 días.
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const en30dias = new Date(hoy)
+  en30dias.setDate(hoy.getDate() + 30)
+
+  // Agrupar confirmados recurrentes por nombre → tomar el más reciente
+  const ultimoPorNombre = new Map<string, Ingreso>()
+  ingresos
+    .filter((i) => i.estado === 'confirmado' && i.es_recurrente)
+    .forEach((i) => {
+      const prev = ultimoPorNombre.get(i.nombre)
+      const fechaI = i.fecha_real ?? i.fecha_esperada ?? ''
+      const fechaPrev = prev ? (prev.fecha_real ?? prev.fecha_esperada ?? '') : ''
+      if (!prev || fechaI > fechaPrev) {
+        ultimoPorNombre.set(i.nombre, i)
+      }
+    })
+
+  // Ingresos no confirmados ya existentes en la DB (para evitar duplicados)
+  const ingresosNoConfirmados = ingresos.filter((i) => i.estado !== 'confirmado')
+
+  const phantoms: Ingreso[] = []
+  for (const i of ultimoPorNombre.values()) {
+    const proxima = calcularProximaFecha(i)
+    if (!proxima || proxima < hoy || proxima > en30dias) continue
+    const proximaStr = proxima.toISOString().split('T')[0]
+    // No generar si ya existe un ingreso con mismo nombre y fecha próxima
+    const yaExiste = ingresosNoConfirmados.some(
+      (j) => j.nombre === i.nombre && j.fecha_esperada === proximaStr
+    )
+    if (yaExiste) continue
+    phantoms.push({
+      ...i,
+      id: `${i.id}_next`,
+      fecha_esperada: proximaStr,
+      fecha_real: null,
+      estado: 'esperado',
+      monto_real: null,
+    })
+  }
+
+  const ingresosConRecurrentes = [...ingresos, ...phantoms]
+
   return (
     <>
       <SaldoHeader cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
-      <KPICards cuentas={cuentas} ingresos={ingresos} compromisos={compromisos} lineas={lineas} />
+      <KPICards cuentas={cuentas} ingresos={ingresosConRecurrentes} compromisos={compromisos} lineas={lineas} />
       <div className="flex gap-2 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <AconsejameButton />
-        </div>
         <ObtenerLiquidezButton lineas={lineas} cuentas={cuentas.filter((c) => c.tipo !== 'inversion')} />
         {cuentas.length >= 2 && (
           <NuevaTransferenciaButton
@@ -97,8 +168,11 @@ async function DashboardData() {
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <CompromisosVencidos compromisos={compromisos} cuentas={cuentas} saldoDisponible={saldoDisponible} />
         <AlertasVencimiento compromisos={compromisos} lineas={lineas} cargos={cargos} saldoDisponible={saldoDisponible} />
-        <ProximosIngresos ingresos={ingresos} cuentas={cuentas} />
+        <div id="proximos-ingresos">
+          <ProximosIngresos ingresos={ingresosConRecurrentes} cuentas={cuentas} />
+        </div>
         <ProximosGastosPrevistos gastos={gastosPrevistos} />
       </div>
     </>

@@ -1,6 +1,8 @@
+'use client'
+
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
-import { ArrowDown, ArrowUp, Calendar, CreditCard, Wallet } from 'lucide-react'
+import { ArrowDown, ArrowUp, Calendar, CreditCard } from 'lucide-react'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
@@ -40,17 +42,36 @@ interface KPICardProps {
   sublabel?: string
   icon: React.ReactNode
   colorClass?: string
+  onClick?: () => void
 }
 
-function KPICard({ label, value, sublabel, icon, colorClass = 'text-foreground' }: KPICardProps) {
-  return (
-    <div className="rounded-xl border bg-card px-5 py-4 flex flex-col gap-2">
+function KPICard({ label, value, sublabel, icon, colorClass = 'text-foreground', onClick }: KPICardProps) {
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
         <span className="text-muted-foreground">{icon}</span>
       </div>
       <p className={`text-xl font-bold leading-none ${colorClass}`}>{value}</p>
       {sublabel && <p className="text-xs text-muted-foreground">{sublabel}</p>}
+    </>
+  )
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="rounded-xl border bg-card px-5 py-4 flex flex-col gap-2 text-left hover:bg-muted/30 transition-colors cursor-pointer"
+      >
+        {content}
+      </button>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border bg-card px-5 py-4 flex flex-col gap-2">
+      {content}
     </div>
   )
 }
@@ -62,7 +83,7 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
   const en30dias = new Date(hoy)
   en30dias.setDate(en30dias.getDate() + 30)
 
-  // 1. Disponible ahora (cuentas líquidas + ingresos confirmados sin cuenta)
+  // Disponible ahora (para proyección)
   const ingresosSinCuenta = ingresos
     .filter((i) => i.estado === 'confirmado' && !i.cuenta_destino_id)
     .reduce((sum, i) => sum + Number(i.monto_real ?? i.monto_esperado ?? 0), 0)
@@ -72,7 +93,7 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
       .filter((c) => c.activa && c.tipo !== 'inversion')
       .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0) + ingresosSinCuenta
 
-  // 2. Por recibir (ingresos pendientes próximos 30 días)
+  // 1. Por recibir (ingresos pendientes próximos 30 días)
   const porRecibir = ingresos
     .filter((i) => {
       if (i.estado === 'confirmado') return false
@@ -82,23 +103,23 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
     })
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
-  // 3. Por pagar — compromisos fijos + líneas de crédito con vencimiento próximo
+  // 2. Por pagar — compromisos fijos + líneas de crédito con vencimiento próximo
   const porPagarCompromisos = compromisos
     .filter((c) => c.activo)
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
 
   const lineasProx30 = lineas.filter((l) => {
-    if (!l.fecha_proximo_pago) return true // sin fecha = incluir siempre
+    if (!l.fecha_proximo_pago) return true
     const fecha = new Date(l.fecha_proximo_pago)
     return fecha >= hoy && fecha <= en30dias
   })
   const porPagarLineas = lineasProx30.reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
   const porPagar = porPagarCompromisos + porPagarLineas
 
-  // 4. Líneas de crédito — totales de pago sin intereses
+  // 3. Líneas de crédito — totales de pago sin intereses
   const totalPSI = lineas.reduce((sum, l) => sum + Number(l.pago_sin_intereses ?? 0), 0)
 
-  // 5. Proyección 15 días = disponible + ingresos prob próx 15d - compromisos próx 15d - líneas próx 15d
+  // 4. Proyección 15 días
   const ingresosProx15 = ingresos
     .filter((i) => {
       if (i.estado === 'en_riesgo') return false
@@ -127,20 +148,18 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
 
   const proyeccion15 = disponible + ingresosProx15 - compromisosProx15 - lineasProx15
 
+  const scrollAProximosIngresos = () => {
+    document.getElementById('proximos-ingresos')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <KPICard
-        label="Disponible ahora"
-        value={formatMXN(disponible)}
-        sublabel="Cuentas líquidas"
-        icon={<Wallet className="size-4" />}
-        colorClass={disponible >= 0 ? 'text-emerald-500' : 'text-destructive'}
-      />
       <KPICard
         label="Por recibir"
         value={formatMXN(porRecibir)}
         sublabel="Próximos 30 días"
         icon={<ArrowDown className="size-4 text-emerald-500" />}
+        onClick={scrollAProximosIngresos}
       />
       <KPICard
         label="Por pagar"

@@ -22,13 +22,14 @@ type ItemVencimiento =
 
 export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoDisponible }: Props) {
   const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
   const en7dias = new Date(hoy)
   en7dias.setDate(en7dias.getDate() + 7)
 
   const proximosCompromisos: ItemVencimiento[] = compromisos
     .filter((c) => {
       if (!c.activo || !c.fecha_proximo_pago) return false
-      const fecha = new Date(c.fecha_proximo_pago)
+      const fecha = new Date(c.fecha_proximo_pago + 'T00:00:00')
       return fecha >= hoy && fecha <= en7dias
     })
     .map((c) => ({ kind: 'compromiso' as const, data: c, dias: diasHastaFecha(c.fecha_proximo_pago!) }))
@@ -36,7 +37,7 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
   const proximasLineas: ItemVencimiento[] = lineas
     .filter((l) => {
       if (!l.activa || !l.fecha_proximo_pago) return false
-      const fecha = new Date(l.fecha_proximo_pago)
+      const fecha = new Date(l.fecha_proximo_pago + 'T00:00:00')
       return fecha >= hoy && fecha <= en7dias
     })
     .map((l) => ({ kind: 'linea' as const, data: l, dias: diasHastaFecha(l.fecha_proximo_pago!) }))
@@ -67,7 +68,7 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
         </h2>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mb-3">
         {proximos.map((item) => {
           const { dias } = item
           const diasBadge = (
@@ -165,6 +166,12 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
             </div>
           )
         })}
+      </div>
+
+      <div className="pt-3 border-t">
+        <a href="/compromisos" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          Ver todos los compromisos →
+        </a>
       </div>
     </div>
   )
