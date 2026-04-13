@@ -10,6 +10,7 @@ import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { marcarPagado, pagarDesdePrestamo } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN } from '@/lib/format'
+import MontoInput from '@/components/ui/MontoInput'
 import type { Recomendacion } from '@/types/finus'
 import type { Database } from '@/types/database'
 
@@ -264,13 +265,10 @@ export default function PagarModal({
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="monto-prestamo">Monto del préstamo</Label>
-                    <Input
+                    <MontoInput
                       id="monto-prestamo"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
                       value={montoPrestamo}
-                      onChange={(e) => setMontoPrestamo(e.target.value)}
+                      onChange={setMontoPrestamo}
                     />
                     <p className="text-xs text-muted-foreground">
                       Puede ser más de lo que necesitas
@@ -311,13 +309,10 @@ export default function PagarModal({
                   {/* Monto personalizado */}
                   <div className="flex flex-col gap-1.5 mb-4">
                     <Label htmlFor="monto-pago">Monto a registrar</Label>
-                    <Input
+                    <MontoInput
                       id="monto-pago"
-                      type="number"
-                      min="0.01"
-                      step="0.01"
                       value={monto}
-                      onChange={(e) => setMonto(e.target.value)}
+                      onChange={setMonto}
                     />
                   </div>
 

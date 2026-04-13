@@ -1,6 +1,12 @@
+'use client'
+
+import { useState } from 'react'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import { getRecomendacion, getRecomendacionLinea } from '@/lib/recommendations'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
+import PagarModal from '@/components/compromisos/PagarModal'
+import PagarLineaModal from '@/components/compromisos/PagarLineaModal'
+import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database'
 import type { CompromisoParaRecomendacion, LineaParaRecomendacion } from '@/types/finus'
 import { AlertCircle } from 'lucide-react'
@@ -8,11 +14,13 @@ import { AlertCircle } from 'lucide-react'
 type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type LineaCredito = Database['public']['Tables']['lineas_credito']['Row']
 type CargoLinea = Database['public']['Tables']['cargos_linea']['Row']
+type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   compromisos: Compromiso[]
   lineas: LineaCredito[]
   cargos: CargoLinea[]
+  cuentas: Cuenta[]
   saldoDisponible: number
 }
 
@@ -20,7 +28,10 @@ type ItemVencimiento =
   | { kind: 'compromiso'; data: Compromiso; dias: number }
   | { kind: 'linea'; data: LineaCredito; dias: number }
 
-export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoDisponible }: Props) {
+export default function AlertasVencimiento({ compromisos, lineas, cargos, cuentas, saldoDisponible }: Props) {
+  const [pagarCompromisoId, setPagarCompromisoId] = useState<string | null>(null)
+  const [pagarLineaId, setPagarLineaId] = useState<string | null>(null)
+
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   const en7dias = new Date(hoy)
@@ -43,6 +54,10 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
     .map((l) => ({ kind: 'linea' as const, data: l, dias: diasHastaFecha(l.fecha_proximo_pago!) }))
 
   const proximos = [...proximosCompromisos, ...proximasLineas].sort((a, b) => a.dias - b.dias)
+
+  // Compromisos y líneas en los modales activos
+  const compromisoActivo = compromisos.find((c) => c.id === pagarCompromisoId) ?? null
+  const lineaActiva = lineas.find((l) => l.id === pagarLineaId) ?? null
 
   if (proximos.length === 0) {
     return (
@@ -107,9 +122,14 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
                     <span className="text-sm font-medium truncate">{compromiso.nombre}</span>
                     {diasBadge}
                   </div>
-                  <span className="text-sm font-semibold tabular-nums shrink-0">
-                    {formatMXN(Number(compromiso.monto_mensualidad ?? compromiso.pago_minimo ?? 0))}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-sm font-semibold tabular-nums">
+                      {formatMXN(Number(compromiso.monto_mensualidad ?? compromiso.pago_minimo ?? 0))}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => setPagarCompromisoId(compromiso.id)}>
+                      Pagar
+                    </Button>
+                  </div>
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Vence {formatFecha(compromiso.fecha_proximo_pago!)}
@@ -119,7 +139,7 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
             )
           }
 
-          // Linea de crédito
+          // Línea de crédito
           const linea = item.data
           const cargosLinea = cargos.filter((c) => c.linea_credito_id === linea.id)
           const lineaInput: LineaParaRecomendacion = {
@@ -150,9 +170,14 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
                   <span className="text-sm font-medium truncate">{linea.nombre}</span>
                   {diasBadge}
                 </div>
-                <span className="text-sm font-semibold tabular-nums shrink-0">
-                  {formatMXN(Number(linea.pago_minimo ?? 0))}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-sm font-semibold tabular-nums">
+                    {formatMXN(Number(linea.pago_minimo ?? 0))}
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => setPagarLineaId(linea.id)}>
+                    Pagar
+                  </Button>
+                </div>
               </div>
               <div className="text-xs text-muted-foreground">
                 Vence {formatFecha(linea.fecha_proximo_pago!)}
@@ -173,6 +198,47 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, saldoD
           Ver todos los compromisos →
         </a>
       </div>
+
+      {/* Modales de pago */}
+      {compromisoActivo && (
+        <PagarModal
+          open={!!pagarCompromisoId}
+          onOpenChange={(open) => { if (!open) setPagarCompromisoId(null) }}
+          compromisoId={compromisoActivo.id}
+          nombre={compromisoActivo.nombre}
+          montoPrincipal={Number(compromisoActivo.monto_mensualidad ?? compromisoActivo.pago_minimo ?? 0)}
+          pagoSinIntereses={compromisoActivo.pago_sin_intereses != null ? Number(compromisoActivo.pago_sin_intereses) : null}
+          pagoMinimo={compromisoActivo.pago_minimo != null ? Number(compromisoActivo.pago_minimo) : null}
+          esRevolvente={compromisoActivo.tipo_pago === 'revolvente'}
+          recomendacion={getRecomendacion(
+            {
+              tipo_pago: compromisoActivo.tipo_pago,
+              saldo_real: compromisoActivo.saldo_real != null ? Number(compromisoActivo.saldo_real) : null,
+              monto_mensualidad: compromisoActivo.monto_mensualidad != null ? Number(compromisoActivo.monto_mensualidad) : null,
+              pago_minimo: compromisoActivo.pago_minimo != null ? Number(compromisoActivo.pago_minimo) : null,
+              pago_sin_intereses: compromisoActivo.pago_sin_intereses != null ? Number(compromisoActivo.pago_sin_intereses) : null,
+              mensualidades_restantes: compromisoActivo.mensualidades_restantes,
+              tasa_interes_anual: compromisoActivo.tasa_interes_anual != null ? Number(compromisoActivo.tasa_interes_anual) : null,
+              fecha_proximo_pago: compromisoActivo.fecha_proximo_pago,
+              nombre: compromisoActivo.nombre,
+            },
+            saldoDisponible
+          )}
+          cuentas={cuentas}
+        />
+      )}
+
+      {lineaActiva && (
+        <PagarLineaModal
+          open={!!pagarLineaId}
+          onOpenChange={(open) => { if (!open) setPagarLineaId(null) }}
+          lineaId={lineaActiva.id}
+          nombre={lineaActiva.nombre}
+          pagoMinimo={lineaActiva.pago_minimo != null ? Number(lineaActiva.pago_minimo) : null}
+          pagoSinIntereses={lineaActiva.pago_sin_intereses != null ? Number(lineaActiva.pago_sin_intereses) : null}
+          cuentas={cuentas}
+        />
+      )}
     </div>
   )
 }

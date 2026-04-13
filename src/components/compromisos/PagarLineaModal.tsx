@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { registrarPagoLinea } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN } from '@/lib/format'
+import MontoInput from '@/components/ui/MontoInput'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -190,14 +191,11 @@ export default function PagarLineaModal({
               {/* Monto personalizado */}
               <div className="flex flex-col gap-1.5 mb-4">
                 <Label htmlFor="monto-linea">Monto a pagar</Label>
-                <Input
+                <MontoInput
                   id="monto-linea"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
                   value={monto}
-                  onChange={(e) => {
-                    setMonto(e.target.value)
+                  onChange={(val) => {
+                    setMonto(val)
                     setTipoPago('parcial')
                   }}
                 />
