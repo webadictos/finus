@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { crearCompromiso, actualizarCompromiso } from '@/app/(dashboard)/compromisos/actions'
+import MontoInput from '@/components/ui/MontoInput'
 import type { Database } from '@/types/database'
 import type { TipoPago } from '@/types/finus'
 
@@ -309,14 +310,10 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                 <Label htmlFor="monto_mensualidad">
                   {isMSI ? 'Mensualidad MSI' : isRevolvente ? 'Monto a pagar este corte' : 'Mensualidad / cuota'}
                 </Label>
-                <Input
+                <MontoInput
                   id="monto_mensualidad"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
                   value={form.monto_mensualidad}
-                  onChange={set('monto_mensualidad')}
+                  onChange={(val) => setForm((p) => ({ ...p, monto_mensualidad: val }))}
                   required
                 />
               </div>
@@ -409,38 +406,26 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                     <div className="flex flex-col gap-3">
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor="saldo_real">Saldo actual de la tarjeta</Label>
-                        <Input
+                        <MontoInput
                           id="saldo_real"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
                           value={form.saldo_real}
-                          onChange={set('saldo_real')}
+                          onChange={(val) => setForm((p) => ({ ...p, saldo_real: val }))}
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor="pago_sin_intereses">Pago para no generar intereses</Label>
-                        <Input
+                        <MontoInput
                           id="pago_sin_intereses"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
                           value={form.pago_sin_intereses}
-                          onChange={set('pago_sin_intereses')}
+                          onChange={(val) => setForm((p) => ({ ...p, pago_sin_intereses: val }))}
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
                         <Label htmlFor="pago_minimo">Pago mínimo</Label>
-                        <Input
+                        <MontoInput
                           id="pago_minimo"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
                           value={form.pago_minimo}
-                          onChange={set('pago_minimo')}
+                          onChange={(val) => setForm((p) => ({ ...p, pago_minimo: val }))}
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">

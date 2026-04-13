@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { crearLineaCredito, actualizarLineaCredito } from '@/app/(dashboard)/compromisos/actions'
+import MontoInput from '@/components/ui/MontoInput'
 
 type TipoLinea = 'tarjeta_credito' | 'linea_digital' | 'bnpl' | 'departamental'
 type TitularTipo = 'personal' | 'pareja' | 'familiar' | 'empresa' | 'tercero'
@@ -56,12 +57,20 @@ export default function NuevaLineaForm({ open, onOpenChange, lineaId, initialVal
   const [titularTipo, setTitularTipo] = useState<TitularTipo>(
     initialValues?.titular_tipo ?? 'personal'
   )
+  const [limiteCredito, setLimiteCredito] = useState(String(initialValues?.limite_credito ?? ''))
+  const [saldoAlCorte, setSaldoAlCorte] = useState(String(initialValues?.saldo_al_corte ?? ''))
+  const [pagoSinIntereses, setPagoSinIntereses] = useState(String(initialValues?.pago_sin_intereses ?? ''))
+  const [pagoMinimo, setPagoMinimo] = useState(String(initialValues?.pago_minimo ?? ''))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setTitularTipo(initialValues?.titular_tipo ?? 'personal')
+      setLimiteCredito(String(initialValues?.limite_credito ?? ''))
+      setSaldoAlCorte(String(initialValues?.saldo_al_corte ?? ''))
+      setPagoSinIntereses(String(initialValues?.pago_sin_intereses ?? ''))
+      setPagoMinimo(String(initialValues?.pago_minimo ?? ''))
       setError(null)
     }
     onOpenChange(next)
@@ -197,14 +206,11 @@ export default function NuevaLineaForm({ open, onOpenChange, lineaId, initialVal
             {/* Límite de crédito */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="limite_credito">Límite de crédito</Label>
-              <Input
+              <input type="hidden" name="limite_credito" value={limiteCredito} />
+              <MontoInput
                 id="limite_credito"
-                name="limite_credito"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                defaultValue={fmtNum(initialValues?.limite_credito)}
+                value={limiteCredito}
+                onChange={setLimiteCredito}
               />
             </div>
 
@@ -216,42 +222,33 @@ export default function NuevaLineaForm({ open, onOpenChange, lineaId, initialVal
                 {/* Saldo al corte */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="saldo_al_corte">Saldo al corte</Label>
-                  <Input
+                  <input type="hidden" name="saldo_al_corte" value={saldoAlCorte} />
+                  <MontoInput
                     id="saldo_al_corte"
-                    name="saldo_al_corte"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    defaultValue={fmtNum(initialValues?.saldo_al_corte)}
+                    value={saldoAlCorte}
+                    onChange={setSaldoAlCorte}
                   />
                 </div>
 
                 {/* Pago sin intereses */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="pago_sin_intereses">Pago para no generar intereses</Label>
-                  <Input
+                  <input type="hidden" name="pago_sin_intereses" value={pagoSinIntereses} />
+                  <MontoInput
                     id="pago_sin_intereses"
-                    name="pago_sin_intereses"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    defaultValue={fmtNum(initialValues?.pago_sin_intereses)}
+                    value={pagoSinIntereses}
+                    onChange={setPagoSinIntereses}
                   />
                 </div>
 
                 {/* Pago mínimo */}
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="pago_minimo">Pago mínimo</Label>
-                  <Input
+                  <input type="hidden" name="pago_minimo" value={pagoMinimo} />
+                  <MontoInput
                     id="pago_minimo"
-                    name="pago_minimo"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    defaultValue={fmtNum(initialValues?.pago_minimo)}
+                    value={pagoMinimo}
+                    onChange={setPagoMinimo}
                   />
                 </div>
               </div>
