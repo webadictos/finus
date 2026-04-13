@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { Dialog } from 'radix-ui'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -50,7 +50,10 @@ interface FormState {
 }
 
 function todayISO() {
-  return new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const offset = now.getTimezoneOffset()
+  const local = new Date(now.getTime() - offset * 60000)
+  return local.toISOString().split('T')[0]
 }
 
 function initialForm(tx?: Transaccion | null): FormState {
@@ -156,6 +159,32 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
   const needsTarjeta = form.forma_pago === 'credito_revolvente' || form.forma_pago === 'msi'
   const needsMsi = form.forma_pago === 'msi'
 
+  // Filtrar cuentas según la forma de pago seleccionada
+  const cuentasFiltradas = useMemo(() => {
+    if (form.forma_pago === 'efectivo') return cuentas.filter((c) => c.tipo === 'efectivo')
+    if (form.forma_pago === 'debito') return cuentas.filter((c) => c.tipo === 'banco' || c.tipo === 'digital')
+    return cuentas
+  }, [form.forma_pago, cuentas])
+
+  // Handler específico para forma_pago: resetea cuenta_id si ya no aplica al nuevo tipo
+  const handleFormaPagoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nuevaForma = e.target.value
+    setForm((p) => {
+      const nuevasFiltradas =
+        nuevaForma === 'efectivo'
+          ? cuentas.filter((c) => c.tipo === 'efectivo')
+          : nuevaForma === 'debito'
+          ? cuentas.filter((c) => c.tipo === 'banco' || c.tipo === 'digital')
+          : cuentas
+      const cuentaSigueValida = nuevasFiltradas.some((c) => c.id === p.cuenta_id)
+      return {
+        ...p,
+        forma_pago: nuevaForma,
+        cuenta_id: cuentaSigueValida ? p.cuenta_id : '',
+      }
+    })
+  }
+
   const selectClass =
     'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
 
@@ -164,7 +193,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <Dialog.Content
-          className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col bg-background shadow-xl focus:outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right duration-300"
+          className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col bg-background shadow-xl overflow-hidden focus:outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right duration-300"
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between border-b px-5 py-4">
@@ -227,7 +256,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                 <select
                   id="g-fp"
                   value={form.forma_pago}
-                  onChange={set('forma_pago')}
+                  onChange={handleFormaPagoChange}
                   className={selectClass}
                 >
                   {FORMA_PAGO_OPTIONS.map((o) => (
@@ -238,7 +267,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                 </select>
               </div>
 
-              {needsCuenta && cuentas.length > 0 && (
+              {needsCuenta && cuentasFiltradas.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="g-cuenta">Cuenta</Label>
                   <select
@@ -248,13 +277,20 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                     className={selectClass}
                   >
                     <option value="">— Selecciona cuenta —</option>
-                    {cuentas.map((c) => (
+                    {cuentasFiltradas.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.nombre}
                       </option>
                     ))}
                   </select>
                 </div>
+              )}
+
+              {needsCuenta && cuentasFiltradas.length === 0 && (
+                <p className="rounded-md bg-yellow-500/10 px-3 py-2 text-sm text-yellow-700 dark:text-yellow-400">
+                  No tienes cuentas de tipo{' '}
+                  {form.forma_pago === 'efectivo' ? 'efectivo' : 'débito'} registradas.
+                </p>
               )}
 
               {needsTarjeta && tarjetas.length > 0 && (
@@ -300,6 +336,11 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                   onChange={set('fecha')}
                   required
                 />
+                {form.fecha > todayISO() && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                    Estás registrando un gasto con fecha futura.
+                  </p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1.5">
