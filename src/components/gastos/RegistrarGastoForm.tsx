@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 import { Dialog } from 'radix-ui'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
+import MontoInput from '@/components/ui/MontoInput'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
 
@@ -94,11 +95,22 @@ interface Props {
   onSave?: (data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) => void
 }
 
+const STORAGE_KEY_CUENTA = 'finus_cuenta_predeterminada'
+
 export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjetas, transaccion, onSave }: Props) {
   const isEditing = !!transaccion
   const [form, setForm] = useState<FormState>(() => initialForm(transaccion))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Al abrir el form por primera vez (no edición), preseleccionar cuenta predeterminada
+  useEffect(() => {
+    if (!open || isEditing) return
+    const cuentaPred = localStorage.getItem(STORAGE_KEY_CUENTA)
+    if (cuentaPred && cuentas.some((c) => c.id === cuentaPred)) {
+      setForm((p) => ({ ...p, cuenta_id: p.cuenta_id || cuentaPred }))
+    }
+  }, [open, isEditing, cuentas])
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
@@ -110,8 +122,13 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
 
   const set =
     (key: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm((p) => ({ ...p, [key]: e.target.value }))
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      const value = e.target.value
+      if (key === 'cuenta_id' && value) {
+        localStorage.setItem(STORAGE_KEY_CUENTA, value)
+      }
+      setForm((p) => ({ ...p, [key]: value }))
+    }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -212,14 +229,10 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
               {/* Monto — grande y primero */}
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="g-monto">Monto</Label>
-                <Input
+                <MontoInput
                   id="g-monto"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
                   value={form.monto}
-                  onChange={set('monto')}
+                  onChange={(val) => setForm((p) => ({ ...p, monto: val }))}
                   className="text-2xl h-14 font-bold"
                   required
                 />
