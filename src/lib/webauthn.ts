@@ -1,6 +1,16 @@
-import type { Factor } from '@supabase/auth-js'
-
-export type WebAuthnFactor = Factor<'webauthn'>
+export type WebAuthnCredentialRecord = {
+  id: string
+  user_id: string
+  credential_id: string
+  public_key: string
+  counter: number
+  device_name: string | null
+  transports: string[] | null
+  device_type: string | null
+  backed_up: boolean
+  last_used_at: string | null
+  created_at: string
+}
 
 export function isWebAuthnAvailable() {
   return (
@@ -10,13 +20,9 @@ export function isWebAuthnAvailable() {
   )
 }
 
-export function getVerifiedWebAuthnFactors(factors: Factor[] | undefined) {
-  return (factors ?? []).filter(
-    (factor): factor is WebAuthnFactor =>
-      factor.factor_type === 'webauthn' && factor.status === 'verified'
-  )
-}
-
-export function formatPasskeyName(factor: WebAuthnFactor, index: number) {
-  return factor.friendly_name?.trim() || `Passkey ${index + 1}`
+export function formatPasskeyName(
+  credential: Pick<WebAuthnCredentialRecord, 'device_name' | 'created_at'>,
+  index: number
+) {
+  return credential.device_name?.trim() || `Passkey ${index + 1}`
 }

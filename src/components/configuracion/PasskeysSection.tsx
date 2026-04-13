@@ -1,14 +1,13 @@
 'use client'
 
+import { startRegistration } from '@simplewebauthn/browser'
 import { useCallback, useEffect, useState, useTransition } from 'react'
 import { Fingerprint, KeyRound, ShieldCheck, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { createClient } from '@/lib/supabase/client'
 import {
   formatPasskeyName,
-  getVerifiedWebAuthnFactors,
   isWebAuthnAvailable,
-  type WebAuthnFactor,
+  type WebAuthnCredentialRecord,
 } from '@/lib/webauthn'
 
 type Notice = { tipo: 'ok' | 'error'; texto: string } | null
@@ -21,80 +20,111 @@ function formatDate(value: string) {
   })
 }
 
+async function parseJson<T>(response: Response): Promise<T> {
+  const data = (await response.json()) as T & { error?: string }
+  if (!response.ok) {
+    throw new Error(data.error || 'Ocurrió un error')
+  }
+  return data
+}
+
 export default function PasskeysSection() {
-  const [supabase] = useState(() => createClient())
   const [isSupported] = useState(() => isWebAuthnAvailable())
-  const [factors, setFactors] = useState<WebAuthnFactor[]>([])
-  const [currentLevel, setCurrentLevel] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<WebAuthnCredentialRecord[]>([])
   const [notice, setNotice] = useState<Notice>(null)
   const [isPending, startTransition] = useTransition()
 
-  const loadFactors = useCallback(async () => {
-    const [{ data: factorsData, error: factorsError }, { data: aalData, error: aalError }] =
-      await Promise.all([
-        supabase.auth.mfa.listFactors(),
-        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
-      ])
-
-    if (factorsError) {
-      setNotice({ tipo: 'error', texto: factorsError.message })
-      return
-    }
-
-    if (aalError) {
-      setNotice({ tipo: 'error', texto: aalError.message })
-      return
-    }
-
-    setFactors(getVerifiedWebAuthnFactors(factorsData?.all))
-    setCurrentLevel(aalData?.currentLevel ?? null)
-  }, [supabase])
+  const loadCredentials = useCallback(async () => {
+    const response = await fetch('/api/webauthn/credentials', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+    const data = await parseJson<{ credentials: WebAuthnCredentialRecord[] }>(response)
+    setCredentials(data.credentials)
+  }, [])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void loadFactors()
+      void loadCredentials().catch((error: unknown) => {
+        setNotice({
+          tipo: 'error',
+          texto: error instanceof Error ? error.message : 'No se pudieron cargar las passkeys.',
+        })
+      })
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
-  }, [loadFactors])
+  }, [loadCredentials])
 
   const handleRegister = () => {
     startTransition(async () => {
       setNotice(null)
 
-      const friendlyName =
-        window.prompt('Nombre para esta passkey', 'Este dispositivo')?.trim() ||
-        'Este dispositivo'
+      try {
+        const deviceName =
+          window.prompt('Nombre para esta passkey', 'Este dispositivo')?.trim() ||
+          'Este dispositivo'
 
-      const { error } = await supabase.auth.mfa.webauthn.register({
-        friendlyName,
-      })
+        const optionsResponse = await fetch('/api/webauthn/register/options', {
+          method: 'POST',
+          credentials: 'include',
+        })
+        const options = await parseJson<Parameters<typeof startRegistration>[0]['optionsJSON']>(
+          optionsResponse
+        )
 
-      if (error) {
-        setNotice({ tipo: 'error', texto: error.message })
-        return
+        const registrationResponse = await startRegistration({ optionsJSON: options })
+
+        const verifyResponse = await fetch('/api/webauthn/register/verify', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            response: registrationResponse,
+            deviceName,
+          }),
+        })
+
+        await parseJson<{ ok: true }>(verifyResponse)
+        await loadCredentials()
+        setNotice({
+          tipo: 'ok',
+          texto: 'Passkey registrada. Ya puedes usarla para desbloquear Finus tras un periodo de inactividad.',
+        })
+      } catch (error) {
+        setNotice({
+          tipo: 'error',
+          texto: error instanceof Error ? error.message : 'No se pudo registrar la passkey.',
+        })
       }
-
-      await loadFactors()
-      setNotice({
-        tipo: 'ok',
-        texto: 'Passkey registrada. Ya puedes usar Face ID, Touch ID o PIN para desbloquear Finus en este dispositivo.',
-      })
     })
   }
 
-  const handleDelete = (factorId: string) => {
+  const handleDelete = (credentialId: string) => {
     startTransition(async () => {
       setNotice(null)
-      const { error } = await supabase.auth.mfa.unenroll({ factorId })
 
-      if (error) {
-        setNotice({ tipo: 'error', texto: error.message })
-        return
+      try {
+        const response = await fetch('/api/webauthn/credentials', {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ credentialId }),
+        })
+
+        await parseJson<{ ok: true }>(response)
+        await loadCredentials()
+        setNotice({ tipo: 'ok', texto: 'Passkey eliminada.' })
+      } catch (error) {
+        setNotice({
+          tipo: 'error',
+          texto: error instanceof Error ? error.message : 'No se pudo eliminar la passkey.',
+        })
       }
-
-      await loadFactors()
-      setNotice({ tipo: 'ok', texto: 'Passkey eliminada.' })
     })
   }
 
@@ -115,10 +145,10 @@ export default function PasskeysSection() {
                 <Fingerprint className="size-5" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Desbloqueo biométrico</p>
+                <p className="text-sm font-medium">Passkeys propias de Finus</p>
                 <p className="text-sm text-muted-foreground">
                   {isSupported
-                    ? 'Tu navegador soporta WebAuthn. Puedes registrar una passkey para desbloqueo por inactividad.'
+                    ? 'Tu navegador soporta WebAuthn. Las passkeys se guardan como credenciales seguras asociadas a tu cuenta.'
                     : 'Este navegador o contexto no soporta WebAuthn. Necesitas HTTPS o localhost y un dispositivo compatible.'}
                 </p>
               </div>
@@ -131,10 +161,12 @@ export default function PasskeysSection() {
           </div>
 
           <div className="rounded-xl border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-            Nivel de autenticación actual:{' '}
-            <span className="font-medium text-foreground">
-              {currentLevel?.toUpperCase() ?? 'AAL1'}
-            </span>
+            Passkeys registradas:{' '}
+            <span className="font-medium text-foreground">{credentials.length}</span>
+          </div>
+
+          <div className="rounded-xl border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
+            Por ahora estas passkeys se usan para desbloqueo y reautenticación dentro de tu sesión.
           </div>
 
           {notice && (
@@ -149,33 +181,33 @@ export default function PasskeysSection() {
             </p>
           )}
 
-          {factors.length === 0 ? (
+          {credentials.length === 0 ? (
             <div className="rounded-xl border border-dashed px-4 py-5 text-sm text-muted-foreground">
               Todavía no registras ninguna passkey en esta cuenta.
             </div>
           ) : (
             <div className="flex flex-col gap-2">
-              {factors.map((factor, index) => (
+              {credentials.map((credential, index) => (
                 <div
-                  key={factor.id}
+                  key={credential.id}
                   className="flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="size-4 text-emerald-600" />
                       <p className="text-sm font-medium">
-                        {formatPasskeyName(factor, index)}
+                        {formatPasskeyName(credential, index)}
                       </p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Registrada el {formatDate(factor.created_at)}
+                      Registrada el {formatDate(credential.created_at)}
                     </p>
                   </div>
 
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDelete(factor.id)}
+                    onClick={() => handleDelete(credential.id)}
                     disabled={isPending}
                   >
                     <Trash2 className="mr-1.5 size-3.5" />

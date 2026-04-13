@@ -930,6 +930,48 @@ export interface Database {
         }
         Relationships: Rel[]
       }
+      webauthn_credentials: {
+        Row: {
+          id: string
+          user_id: string
+          credential_id: string
+          public_key: string
+          counter: number
+          device_name: string | null
+          transports: string[] | null
+          device_type: string | null
+          backed_up: boolean
+          last_used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          credential_id: string
+          public_key: string
+          counter?: number
+          device_name?: string | null
+          transports?: string[] | null
+          device_type?: string | null
+          backed_up?: boolean
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          credential_id?: string
+          public_key?: string
+          counter?: number
+          device_name?: string | null
+          transports?: string[] | null
+          device_type?: string | null
+          backed_up?: boolean
+          last_used_at?: string | null
+          created_at?: string
+        }
+        Relationships: Rel[]
+      }
     }
     Views: {
       [_ in never]: {

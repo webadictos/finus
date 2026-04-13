@@ -1,17 +1,29 @@
 'use client'
 
+import { startAuthentication } from '@simplewebauthn/browser'
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { Fingerprint, Lock, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
-import { formatPasskeyName, getVerifiedWebAuthnFactors, type WebAuthnFactor } from '@/lib/webauthn'
+import {
+  formatPasskeyName,
+  type WebAuthnCredentialRecord,
+} from '@/lib/webauthn'
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
 
 interface Props {
   email: string
+}
+
+async function parseJson<T>(response: Response): Promise<T> {
+  const data = (await response.json()) as T & { error?: string }
+  if (!response.ok) {
+    throw new Error(data.error || 'Ocurrió un error')
+  }
+  return data
 }
 
 export default function IdleLockOverlay({ email }: Props) {
@@ -20,37 +32,46 @@ export default function IdleLockOverlay({ email }: Props) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [unlockMode, setUnlockMode] = useState<'passkey' | 'password'>('passkey')
-  const [factors, setFactors] = useState<WebAuthnFactor[]>([])
+  const [credentials, setCredentials] = useState<WebAuthnCredentialRecord[]>([])
   const [lastActivityAt, setLastActivityAt] = useState(() => Date.now())
   const [isAuthenticating, startTransition] = useTransition()
   const lastActivityRef = useRef(lastActivityAt)
 
-  const loadFactors = useCallback(async () => {
-    const { data, error: factorsError } = await supabase.auth.mfa.listFactors()
-    if (factorsError) {
-      setError(factorsError.message)
+  const loadCredentials = useCallback(async () => {
+    const response = await fetch('/api/webauthn/credentials', {
+      credentials: 'include',
+      cache: 'no-store',
+    })
+
+    if (response.status === 401) {
+      setCredentials([])
       return
     }
 
-    setFactors(getVerifiedWebAuthnFactors(data?.all))
-  }, [supabase])
+    const data = await parseJson<{ credentials: WebAuthnCredentialRecord[] }>(response)
+    setCredentials(data.credentials)
+  }, [])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      void loadFactors()
+      void loadCredentials().catch(() => {
+        setCredentials([])
+      })
     }, 0)
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      void loadFactors()
+      void loadCredentials().catch(() => {
+        setCredentials([])
+      })
     })
 
     return () => {
       window.clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
-  }, [loadFactors, supabase])
+  }, [loadCredentials, supabase])
 
   useEffect(() => {
     if (isLocked) return
@@ -83,7 +104,7 @@ export default function IdleLockOverlay({ email }: Props) {
     const intervalId = window.setInterval(() => {
       if (Date.now() - lastActivityRef.current >= IDLE_TIMEOUT_MS) {
         setIsLocked(true)
-        setUnlockMode(factors.length > 0 ? 'passkey' : 'password')
+        setUnlockMode(credentials.length > 0 ? 'passkey' : 'password')
         setError(null)
       }
     }, 15_000)
@@ -95,7 +116,7 @@ export default function IdleLockOverlay({ email }: Props) {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.clearInterval(intervalId)
     }
-  }, [factors.length, isLocked])
+  }, [credentials.length, isLocked])
 
   const resetLockState = () => {
     const now = Date.now()
@@ -107,7 +128,7 @@ export default function IdleLockOverlay({ email }: Props) {
   }
 
   const handlePasskeyUnlock = () => {
-    if (factors.length === 0) {
+    if (credentials.length === 0) {
       setError('No hay passkeys registradas para esta cuenta.')
       setUnlockMode('password')
       return
@@ -115,16 +136,41 @@ export default function IdleLockOverlay({ email }: Props) {
 
     startTransition(async () => {
       setError(null)
-      const { error: authError } = await supabase.auth.mfa.webauthn.authenticate({
-        factorId: factors[0].id,
-      })
 
-      if (authError) {
-        setError(authError.message)
-        return
+      try {
+        const optionsResponse = await fetch('/api/webauthn/authenticate/options', {
+          method: 'POST',
+          credentials: 'include',
+        })
+        const options = await parseJson<Parameters<typeof startAuthentication>[0]['optionsJSON']>(
+          optionsResponse
+        )
+
+        const authenticationResponse = await startAuthentication({
+          optionsJSON: options,
+        })
+
+        const verifyResponse = await fetch('/api/webauthn/authenticate/verify', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            response: authenticationResponse,
+          }),
+        })
+
+        await parseJson<{ ok: true }>(verifyResponse)
+        await loadCredentials()
+        resetLockState()
+      } catch (unlockError) {
+        setError(
+          unlockError instanceof Error
+            ? unlockError.message
+            : 'No se pudo verificar la passkey.'
+        )
       }
-
-      resetLockState()
     })
   }
 
@@ -147,6 +193,7 @@ export default function IdleLockOverlay({ email }: Props) {
         return
       }
 
+      await loadCredentials().catch(() => undefined)
       resetLockState()
     })
   }
@@ -174,12 +221,12 @@ export default function IdleLockOverlay({ email }: Props) {
             </div>
           </div>
 
-          {factors.length > 0 && (
+          {credentials.length > 0 && (
             <div className="rounded-2xl border bg-muted/40 p-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="size-4 text-emerald-600" />
                 <p className="text-sm font-medium">
-                  Passkey disponible: {formatPasskeyName(factors[0], 0)}
+                  Passkey disponible: {formatPasskeyName(credentials[0], 0)}
                 </p>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -195,7 +242,7 @@ export default function IdleLockOverlay({ email }: Props) {
           )}
 
           <div className="flex flex-col gap-3">
-            {factors.length > 0 && (
+            {credentials.length > 0 && (
               <Button onClick={handlePasskeyUnlock} disabled={isAuthenticating}>
                 <Fingerprint className="mr-2 size-4" />
                 {isAuthenticating && unlockMode === 'passkey'
@@ -208,18 +255,18 @@ export default function IdleLockOverlay({ email }: Props) {
               variant="outline"
               onClick={() =>
                 setUnlockMode((current) =>
-                  current === 'password' && factors.length > 0 ? 'passkey' : 'password'
+                  current === 'password' && credentials.length > 0 ? 'passkey' : 'password'
                 )
               }
               disabled={isAuthenticating}
             >
-              {unlockMode === 'password' && factors.length > 0
+              {unlockMode === 'password' && credentials.length > 0
                 ? 'Usar passkey en su lugar'
                 : 'Usar contraseña'}
             </Button>
           </div>
 
-          {(unlockMode === 'password' || factors.length === 0) && (
+          {(unlockMode === 'password' || credentials.length === 0) && (
             <form onSubmit={handlePasswordUnlock} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="unlock-password">Contraseña</Label>
