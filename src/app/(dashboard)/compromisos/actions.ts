@@ -722,6 +722,67 @@ export async function pagarDesdePrestamo(
   }
 }
 
+export async function pagarLineaDesdePrestamo(
+  lineaId: string,
+  montoLinea: number,
+  tipoPago: 'minimo' | 'sin_intereses' | 'parcial' | 'total',
+  prestamista: string,
+  montoPrestamo: number,
+  fechaDevolucion: string
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  // 1. Insertar en pagos_linea
+  const { error: insertError } = await supabase.from('pagos_linea').insert({
+    linea_credito_id: lineaId,
+    usuario_id: user.id,
+    fecha: hoy,
+    monto_pagado: montoLinea,
+    tipo_pago: tipoPago,
+    cuenta_origen_id: null,
+  })
+  if (insertError) return { error: insertError.message }
+
+  // 2. Decrementar saldo de la línea
+  const { error: rpcError } = await supabase.rpc('decrementar_saldo_linea', {
+    p_linea_id: lineaId,
+    p_monto: montoLinea,
+  })
+  if (rpcError) return { error: rpcError.message }
+
+  // 3. Obtener nombre de la línea para la descripción
+  const { data: linea } = await supabase
+    .from('lineas_credito')
+    .select('nombre')
+    .eq('id', lineaId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  // 4. Crear compromiso de devolución
+  const { error: devoError } = await supabase.from('compromisos').insert({
+    usuario_id: user.id,
+    nombre: `Devolución a ${prestamista}`,
+    categoria: `Préstamo para pago: ${linea?.nombre ?? 'línea de crédito'}`,
+    tipo_pago: 'prestamo' as const,
+    monto_mensualidad: montoPrestamo,
+    fecha_proximo_pago: fechaDevolucion,
+    mensualidades_restantes: 1,
+    prioridad: 'alta' as const,
+    activo: true,
+  })
+  if (devoError) return { error: devoError.message }
+
+  revalidatePath('/compromisos')
+  revalidatePath('/')
+  return {}
+}
+
 export async function deshacerMarcarPagado(
   transaccionId: string,
   compromisoId: string,

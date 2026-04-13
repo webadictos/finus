@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
-import { registrarPagoLinea } from '@/app/(dashboard)/compromisos/actions'
+import { registrarPagoLinea, pagarLineaDesdePrestamo } from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN } from '@/lib/format'
 import MontoInput from '@/components/ui/MontoInput'
 import type { Database } from '@/types/database'
@@ -42,6 +42,12 @@ export default function PagarLineaModal({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
+  // Estado del modo préstamo
+  const [modoPrestamo, setModoPrestamo] = useState(false)
+  const [prestamista, setPrestamista] = useState('')
+  const [montoPrestamo, setMontoPrestamo] = useState('')
+  const [fechaDevolucion, setFechaDevolucion] = useState('')
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
       // Pre-seleccionar sin intereses si está disponible, sino mínimo
@@ -58,6 +64,10 @@ export default function PagarLineaModal({
       setCuentaId('')
       setError(null)
       setSuccess(false)
+      setModoPrestamo(false)
+      setPrestamista('')
+      setMontoPrestamo('')
+      setFechaDevolucion('')
     }
     onOpenChange(next)
   }
@@ -69,27 +79,65 @@ export default function PagarLineaModal({
   }
 
   const confirmar = () => {
-    const val = parseFloat(monto)
-    if (isNaN(val) || val <= 0) {
-      setError('Ingresa un monto válido mayor a 0')
-      return
+    if (modoPrestamo) {
+      if (!prestamista.trim()) {
+        setError('Indica quién te presta')
+        return
+      }
+      const val = parseFloat(montoPrestamo)
+      if (isNaN(val) || val <= 0) {
+        setError('Ingresa un monto válido mayor a 0')
+        return
+      }
+      if (!fechaDevolucion) {
+        setError('Indica la fecha de devolución')
+        return
+      }
+    } else {
+      const val = parseFloat(monto)
+      if (isNaN(val) || val <= 0) {
+        setError('Ingresa un monto válido mayor a 0')
+        return
+      }
     }
     setError(null)
     setConfirmOpen(true)
   }
 
   const ejecutarPago = () => {
-    const val = parseFloat(monto)
-    startTransition(async () => {
-      const result = await registrarPagoLinea(lineaId, val, tipoPago, cuentaId || null)
-      setConfirmOpen(false)
-      if (result.error) {
-        setError(result.error)
-      } else {
-        setSuccess(true)
-        setTimeout(() => onOpenChange(false), 1200)
-      }
-    })
+    if (modoPrestamo) {
+      const montoLinea = parseFloat(monto) || 0
+      const val = parseFloat(montoPrestamo)
+      startTransition(async () => {
+        const result = await pagarLineaDesdePrestamo(
+          lineaId,
+          montoLinea,
+          tipoPago,
+          prestamista.trim(),
+          val,
+          fechaDevolucion
+        )
+        setConfirmOpen(false)
+        if (result.error) {
+          setError(result.error)
+        } else {
+          setSuccess(true)
+          setTimeout(() => onOpenChange(false), 1200)
+        }
+      })
+    } else {
+      const val = parseFloat(monto)
+      startTransition(async () => {
+        const result = await registrarPagoLinea(lineaId, val, tipoPago, cuentaId || null)
+        setConfirmOpen(false)
+        if (result.error) {
+          setError(result.error)
+        } else {
+          setSuccess(true)
+          setTimeout(() => onOpenChange(false), 1200)
+        }
+      })
+    }
   }
 
   const montoSeleccionado = parseFloat(monto)
@@ -160,52 +208,102 @@ export default function PagarLineaModal({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setTipoPago('parcial')}
-                    className={tipoPago === 'parcial' ? 'border-primary text-primary' : ''}
+                    onClick={() => { setTipoPago('parcial'); setModoPrestamo(false) }}
+                    className={!modoPrestamo && tipoPago === 'parcial' ? 'border-primary text-primary' : ''}
                   >
                     Otro monto
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setModoPrestamo(true)
+                      setMontoPrestamo(monto || String(pagoMinimo ?? 0))
+                    }}
+                    className={modoPrestamo ? 'border-primary text-primary' : ''}
+                  >
+                    Pagar desde préstamo
                   </Button>
                 </div>
               </div>
 
-              {/* Cuenta origen */}
-              {cuentas.length > 0 && (
-                <div className="flex flex-col gap-1.5 mb-3">
-                  <Label htmlFor="cuenta-linea">Pagar desde cuenta</Label>
-                  <select
-                    id="cuenta-linea"
-                    value={cuentaId}
-                    onChange={(e) => setCuentaId(e.target.value)}
-                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30"
-                  >
-                    <option value="">— Sin descontar de cuenta —</option>
-                    {cuentas.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre} ({formatMXN(Number(c.saldo_actual ?? 0))})
-                      </option>
-                    ))}
-                  </select>
+              {/* Subformulario inline: modo préstamo */}
+              {modoPrestamo ? (
+                <div className="flex flex-col gap-3 mb-4 rounded-lg border bg-muted/30 px-4 py-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="prestamista-linea">¿Quién te presta?</Label>
+                    <Input
+                      id="prestamista-linea"
+                      placeholder="ej. hermana, mamá"
+                      value={prestamista}
+                      onChange={(e) => setPrestamista(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="monto-prestamo-linea">Monto del préstamo</Label>
+                    <MontoInput
+                      id="monto-prestamo-linea"
+                      value={montoPrestamo}
+                      onChange={setMontoPrestamo}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Puede ser más de lo que necesitas
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="fecha-devolucion-linea">¿Para cuándo lo devuelves?</Label>
+                    <Input
+                      id="fecha-devolucion-linea"
+                      type="date"
+                      value={fechaDevolucion}
+                      onChange={(e) => setFechaDevolucion(e.target.value)}
+                    />
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {/* Cuenta origen */}
+                  {cuentas.length > 0 && (
+                    <div className="flex flex-col gap-1.5 mb-3">
+                      <Label htmlFor="cuenta-linea">Pagar desde cuenta</Label>
+                      <select
+                        id="cuenta-linea"
+                        value={cuentaId}
+                        onChange={(e) => setCuentaId(e.target.value)}
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30"
+                      >
+                        <option value="">— Sin descontar de cuenta —</option>
+                        {cuentas.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nombre} ({formatMXN(Number(c.saldo_actual ?? 0))})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Monto personalizado */}
+                  <div className="flex flex-col gap-1.5 mb-4">
+                    <Label htmlFor="monto-linea">Monto a pagar</Label>
+                    <MontoInput
+                      id="monto-linea"
+                      value={monto}
+                      onChange={(val) => {
+                        setMonto(val)
+                        setTipoPago('parcial')
+                      }}
+                    />
+                  </div>
+
+                  <p className="mb-4 text-xs text-muted-foreground">
+                    {cuentaSeleccionada
+                      ? `Se descontará de: ${cuentaSeleccionada.nombre}`
+                      : 'No descontará de ninguna cuenta — solo queda registrado.'}
+                  </p>
+                </>
               )}
-
-              {/* Monto personalizado */}
-              <div className="flex flex-col gap-1.5 mb-4">
-                <Label htmlFor="monto-linea">Monto a pagar</Label>
-                <MontoInput
-                  id="monto-linea"
-                  value={monto}
-                  onChange={(val) => {
-                    setMonto(val)
-                    setTipoPago('parcial')
-                  }}
-                />
-              </div>
-
-              <p className="mb-4 text-xs text-muted-foreground">
-                {cuentaSeleccionada
-                  ? `Se descontará de: ${cuentaSeleccionada.nombre}`
-                  : 'No descontará de ninguna cuenta — solo queda registrado.'}
-              </p>
 
               {error && (
                 <p className="mb-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -226,6 +324,10 @@ export default function PagarLineaModal({
         onOpenChange={setConfirmOpen}
         titulo="¿Registrar pago?"
         descripcion={(() => {
+          if (modoPrestamo) {
+            const val = parseFloat(montoPrestamo) || 0
+            return `¿Marcar "${nombre}" como pagado y crear devolución a ${prestamista || '...'} por ${formatMXN(val)} para el ${fechaDevolucion || '...'}?`
+          }
           const val = isNaN(montoSeleccionado) ? 0 : montoSeleccionado
           const montoStr = formatMXN(val)
           return cuentaSeleccionada
