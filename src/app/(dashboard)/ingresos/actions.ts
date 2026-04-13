@@ -1,5 +1,6 @@
 'use server'
 
+import { calcularSiguienteFechaIngreso } from '@/lib/ingresos'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -11,25 +12,6 @@ export type ConfirmarIngresoResult = {
 }
 
 type Frecuencia = 'mensual' | 'quincenal' | 'semanal' | 'anual'
-
-function siguienteFecha(fecha: string, frecuencia: Frecuencia): string {
-  const d = new Date(fecha + 'T12:00:00')
-  switch (frecuencia) {
-    case 'mensual':
-      d.setMonth(d.getMonth() + 1)
-      break
-    case 'quincenal':
-      d.setDate(d.getDate() + 15)
-      break
-    case 'semanal':
-      d.setDate(d.getDate() + 7)
-      break
-    case 'anual':
-      d.setFullYear(d.getFullYear() + 1)
-      break
-  }
-  return d.toISOString().split('T')[0]
-}
 
 export async function crearIngreso(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
@@ -202,32 +184,46 @@ export async function confirmarIngreso(
   // 4. Si es recurrente, generar la siguiente instancia
   let nextIngresoId: string | null = null
   if (ingreso.es_recurrente && ingreso.fecha_esperada && ingreso.frecuencia) {
-    const nextFecha = siguienteFecha(
-      ingreso.fecha_esperada,
+    const baseFecha = fechaReal || ingreso.fecha_esperada
+    const nextFecha = calcularSiguienteFechaIngreso(
+      baseFecha,
       ingreso.frecuencia as Frecuencia
     )
 
-    const { data: nextData } = await supabase
+    const { data: existente } = await supabase
       .from('ingresos')
-      .insert({
-        usuario_id: user.id,
-        nombre: ingreso.nombre,
-        tipo: ingreso.tipo,
-        es_recurrente: true,
-        frecuencia: ingreso.frecuencia,
-        dia_del_mes: ingreso.dia_del_mes,
-        monto_fijo: ingreso.monto_fijo,
-        monto_esperado: ingreso.monto_fijo ?? ingreso.monto_esperado,
-        fecha_esperada: nextFecha,
-        estado: 'esperado' as const,
-        probabilidad: ingreso.probabilidad ?? 'alta',
-        // Heredar la cuenta efectiva (no la original pre-confirmación que podría ser null)
-        cuenta_destino_id: efectivaCuentaId,
-      })
       .select('id')
-      .single()
+      .eq('usuario_id', user.id)
+      .eq('nombre', ingreso.nombre)
+      .eq('fecha_esperada', nextFecha)
+      .neq('estado', 'confirmado')
+      .maybeSingle()
 
-    nextIngresoId = nextData?.id ?? null
+    if (existente) {
+      nextIngresoId = existente.id
+    } else {
+      const { data: nextData } = await supabase
+        .from('ingresos')
+        .insert({
+          usuario_id: user.id,
+          nombre: ingreso.nombre,
+          tipo: ingreso.tipo,
+          es_recurrente: true,
+          frecuencia: ingreso.frecuencia,
+          dia_del_mes: ingreso.dia_del_mes,
+          monto_fijo: ingreso.monto_fijo,
+          monto_esperado: ingreso.monto_fijo ?? ingreso.monto_esperado,
+          fecha_esperada: nextFecha,
+          estado: 'esperado' as const,
+          probabilidad: ingreso.probabilidad ?? 'alta',
+          // Heredar la cuenta efectiva (no la original pre-confirmación que podría ser null)
+          cuenta_destino_id: efectivaCuentaId,
+        })
+        .select('id')
+        .single()
+
+      nextIngresoId = nextData?.id ?? null
+    }
   }
 
   revalidatePath('/ingresos')

@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import GastosClient from '@/components/gastos/GastosClient'
+import { parseTags, type TagItem } from '@/lib/tags'
+import type { Database } from '@/types/database'
 
 interface Props {
   searchParams: Promise<{ mes?: string }>
@@ -57,12 +59,17 @@ export default async function GastosPage({ searchParams }: Props) {
   ])
 
   // Aplanar y deduplicar todas las etiquetas usadas
-  const etiquetasSugeridas = [
-    ...new Set(
-      (etiquetasRes.data ?? [])
-        .flatMap((t) => (t as { etiquetas: string[] | null }).etiquetas ?? [])
-    ),
-  ].sort()
+  const etiquetasMap = new Map<string, TagItem>()
+  for (const tx of etiquetasRes.data ?? []) {
+    for (const tag of parseTags((tx as { etiquetas: Database['public']['Tables']['transacciones']['Row']['etiquetas'] }).etiquetas)) {
+      if (!etiquetasMap.has(tag.slug)) {
+        etiquetasMap.set(tag.slug, tag)
+      }
+    }
+  }
+  const etiquetasSugeridas = Array.from(etiquetasMap.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, 'es-MX')
+  )
 
   return (
     <div className="flex flex-col gap-6 p-6">

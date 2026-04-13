@@ -3,11 +3,12 @@
 import { useState, useRef, useCallback } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { normalizeTag, slugifyTag, type TagItem } from '@/lib/tags'
 
 interface Props {
-  value: string[]
-  onChange: (tags: string[]) => void
-  sugerencias?: string[]
+  value: TagItem[]
+  onChange: (tags: TagItem[]) => void
+  sugerencias?: TagItem[]
   placeholder?: string
   className?: string
 }
@@ -24,12 +25,10 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
   const [showSugs, setShowSugs] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const normalizar = (s: string) => s.trim().toLowerCase().replace(/\s+/g, '-')
-
   const agregarTag = useCallback(
     (raw: string) => {
-      const tag = normalizar(raw)
-      if (!tag || value.includes(tag)) return
+      const tag = normalizeTag(raw)
+      if (!tag || value.some((item) => item.slug === tag.slug)) return
       onChange([...value, tag])
       setInput('')
       setShowSugs(false)
@@ -37,7 +36,7 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
     [value, onChange]
   )
 
-  const eliminarTag = (tag: string) => onChange(value.filter((t) => t !== tag))
+  const eliminarTag = (slug: string) => onChange(value.filter((t) => t.slug !== slug))
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -50,8 +49,17 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
     }
   }
 
+  const inputSlug = slugifyTag(input)
   const sugerenciasFiltradas = sugerencias
-    .filter((s) => s.includes(input.toLowerCase()) && !value.includes(s))
+    .filter((s) => {
+      const query = input.trim().toLowerCase()
+      if (!query) return !value.some((item) => item.slug === s.slug)
+
+      return (
+        (s.label.toLowerCase().includes(query) || s.slug.includes(inputSlug)) &&
+        !value.some((item) => item.slug === s.slug)
+      )
+    })
     .slice(0, 6)
 
   return (
@@ -63,15 +71,16 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
       >
         {value.map((tag) => (
           <span
-            key={tag}
+            key={tag.slug}
             className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+            title={tag.slug}
           >
-            {tag}
+            {tag.label}
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); eliminarTag(tag) }}
+              onClick={(e) => { e.stopPropagation(); eliminarTag(tag.slug) }}
               className="hover:text-destructive"
-              aria-label={`Eliminar etiqueta ${tag}`}
+              aria-label={`Eliminar etiqueta ${tag.label}`}
             >
               <X className="size-3" />
             </button>
@@ -95,28 +104,34 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
         <div className="absolute z-50 top-full mt-1 w-full rounded-md border bg-popover shadow-md">
           {sugerenciasFiltradas.map((s) => (
             <button
-              key={s}
+              key={s.slug}
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); agregarTag(s) }}
+              onMouseDown={(e) => { e.preventDefault(); agregarTag(s.label) }}
               className="w-full px-3 py-1.5 text-left text-sm hover:bg-accent"
             >
-              {s}
+              <span>{s.label}</span>
+              {s.slug !== slugifyTag(s.label) && (
+                <span className="ml-2 text-xs text-muted-foreground">{s.slug}</span>
+              )}
             </button>
           ))}
-          {input.trim() && !sugerencias.includes(normalizar(input)) && (
+          {input.trim() && !sugerencias.some((item) => item.slug === inputSlug) && (
             <button
               type="button"
               onMouseDown={(e) => { e.preventDefault(); agregarTag(input) }}
               className="w-full px-3 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent border-t"
             >
-              Crear &ldquo;<span className="font-medium text-foreground">{normalizar(input)}</span>&rdquo;
+              Crear &ldquo;<span className="font-medium text-foreground">{input.trim()}</span>&rdquo;
+              {inputSlug && (
+                <span className="ml-2 text-xs">slug: {inputSlug}</span>
+              )}
             </button>
           )}
         </div>
       )}
 
       <p className="mt-1 text-xs text-muted-foreground">
-        Escribe y presiona Enter o coma para agregar. Ej: super, bbva, gasolina-pemex
+        Escribe y presiona Enter o coma para agregar. Se guarda `label` y `slug`.
       </p>
     </div>
   )

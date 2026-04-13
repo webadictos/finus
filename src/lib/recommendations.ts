@@ -360,33 +360,38 @@ function recomendarDisposicion(
 /**
  * Genera una recomendación de pago para un compromiso dado el saldo disponible.
  *
- * @param compromiso  - El compromiso a evaluar
- * @param saldoDisponible - Saldo líquido disponible (ya descontado colchón fijo si aplica)
- * @param ingresoProximo  - Próximo ingreso esperado (opcional, para el caso "espera al...")
+ * @param compromiso       - El compromiso a evaluar
+ * @param saldoDisponible  - Saldo líquido bruto
+ * @param ingresoProximo   - Próximo ingreso esperado (opcional, para el caso "espera al...")
+ * @param reservaOperativa - Monto a reservar para gastos básicos antes de comprometer liquidez.
+ *                           Se descuenta de saldoDisponible. Default: 0.
  */
 export function getRecomendacion(
   compromiso: CompromisoParaRecomendacion,
   saldoDisponible: number,
-  ingresoProximo: IngresoProximo | null = null
+  ingresoProximo: IngresoProximo | null = null,
+  reservaOperativa = 0
 ): Recomendacion {
+  const saldoLibre = saldoDisponible - reservaOperativa
+
   switch (compromiso.tipo_pago) {
     case 'fijo':
-      return recomendarFijo(compromiso, saldoDisponible)
+      return recomendarFijo(compromiso, saldoLibre)
 
     case 'msi':
-      return recomendarMSI(compromiso, saldoDisponible)
+      return recomendarMSI(compromiso, saldoLibre)
 
     case 'prestamo':
-      return recomendarPrestamo(compromiso, saldoDisponible)
+      return recomendarPrestamo(compromiso, saldoLibre)
 
     case 'revolvente':
-      return recomendarRevolvente(compromiso, saldoDisponible, ingresoProximo)
+      return recomendarRevolvente(compromiso, saldoLibre, ingresoProximo)
 
     case 'disposicion_efectivo':
-      return recomendarDisposicion(compromiso, saldoDisponible)
+      return recomendarDisposicion(compromiso, saldoLibre)
 
     case 'suscripcion':
-      return recomendarSuscripcion(compromiso, saldoDisponible)
+      return recomendarSuscripcion(compromiso, saldoLibre)
 
     default: {
       const _exhaustive: never = compromiso.tipo_pago
@@ -417,11 +422,12 @@ export function getPrioridadColor(color: ColorRecomendacion): number {
 export function getRecomendaciones(
   compromisos: CompromisoParaRecomendacion[],
   saldoDisponible: number,
-  ingresoProximo: IngresoProximo | null = null
+  ingresoProximo: IngresoProximo | null = null,
+  reservaOperativa = 0
 ): Array<{ compromiso: CompromisoParaRecomendacion; recomendacion: Recomendacion }> {
   const resultados = compromisos.map((compromiso) => ({
     compromiso,
-    recomendacion: getRecomendacion(compromiso, saldoDisponible, ingresoProximo),
+    recomendacion: getRecomendacion(compromiso, saldoDisponible, ingresoProximo, reservaOperativa),
   }))
 
   return resultados.sort(
@@ -544,32 +550,38 @@ function recomendarLinea(
  *
  * Usa los campos globales de la línea (pago_sin_intereses, pago_minimo, saldo_al_corte)
  * que representan el estado de cuenta actual.
+ *
+ * @param reservaOperativa - Monto a reservar para gastos básicos antes de comprometer liquidez.
  */
 export function getRecomendacionLinea(
   linea: LineaParaRecomendacion,
   saldoDisponible: number,
-  ingresoProximo: IngresoProximo | null = null
+  ingresoProximo: IngresoProximo | null = null,
+  reservaOperativa = 0
 ): Recomendacion {
-  return recomendarLinea(linea, saldoDisponible, ingresoProximo)
+  return recomendarLinea(linea, saldoDisponible - reservaOperativa, ingresoProximo)
 }
 
 /**
  * Genera recomendaciones para una lista de líneas de crédito, ordenadas por urgencia.
  *
- * @param ingresos - Lista de ingresos próximos; para cada línea se busca el primero
- *                   que llega antes de su vencimiento.
+ * @param ingresos         - Lista de ingresos próximos; para cada línea se busca el primero
+ *                           que llega antes de su vencimiento.
+ * @param reservaOperativa - Monto a reservar para gastos básicos antes de comprometer liquidez.
  */
 export function getRecomendacionesLineas(
   lineas: LineaParaRecomendacion[],
   saldoDisponible: number,
-  ingresos: IngresoProximo[]
+  ingresos: IngresoProximo[],
+  reservaOperativa = 0
 ): Array<{ linea: LineaParaRecomendacion; recomendacion: Recomendacion }> {
+  const saldoLibre = saldoDisponible - reservaOperativa
   const resultados = lineas.map((linea) => {
     const ingresoProximo =
       ingresos.find((i) => ingresoAntesDelVencimiento(linea.fecha_proximo_pago, i) !== null) ?? null
     return {
       linea,
-      recomendacion: recomendarLinea(linea, saldoDisponible, ingresoProximo),
+      recomendacion: recomendarLinea(linea, saldoLibre, ingresoProximo),
     }
   })
 

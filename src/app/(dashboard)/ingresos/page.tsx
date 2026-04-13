@@ -4,6 +4,7 @@ import { TrendingUp } from 'lucide-react'
 import IngresoCard from '@/components/ingresos/IngresoCard'
 import NuevoIngresoButton from '@/components/ingresos/NuevoIngresoButton'
 import type { Database } from '@/types/database'
+import { getProjectedRecurringIngresos } from '@/lib/ingresos'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 
@@ -25,10 +26,18 @@ export default async function IngresosPage() {
 
   const ingresos: Ingreso[] = data ?? []
   const cuentas = cuentasRes.data ?? []
+  const ingresosConRecurrentes = [
+    ...ingresos,
+    ...getProjectedRecurringIngresos(ingresos),
+  ].sort((a, b) => {
+    const fechaA = a.fecha_esperada ?? '9999-12-31'
+    const fechaB = b.fecha_esperada ?? '9999-12-31'
+    return fechaA.localeCompare(fechaB)
+  })
 
   // Separar en confirmados y pendientes
-  const confirmados = ingresos.filter((i) => i.estado === 'confirmado')
-  const pendientes = ingresos.filter((i) => i.estado !== 'confirmado')
+  const confirmados = ingresosConRecurrentes.filter((i) => i.estado === 'confirmado')
+  const pendientes = ingresosConRecurrentes.filter((i) => i.estado !== 'confirmado')
 
   // KPIs
   const totalConfirmado = confirmados
@@ -37,7 +46,7 @@ export default async function IngresosPage() {
   const totalPendiente = pendientes
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
-  const totalEsperado = ingresos
+  const totalEsperado = ingresosConRecurrentes
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
   return (
@@ -78,7 +87,7 @@ export default async function IngresosPage() {
         </div>
       </div>
 
-      {ingresos.length === 0 ? (
+      {ingresosConRecurrentes.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-12 text-center">
           <TrendingUp className="size-8 text-muted-foreground" />
           <p className="text-sm font-medium">Sin ingresos registrados</p>

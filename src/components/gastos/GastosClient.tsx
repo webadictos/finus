@@ -8,6 +8,7 @@ import GastoCard from '@/components/gastos/GastoCard'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import VincularPrevistoModal from '@/components/gastos/VincularPrevistoModal'
 import { formatMXN } from '@/lib/format'
+import type { TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 
@@ -90,7 +91,7 @@ interface Props {
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
   mes: string
-  etiquetasSugeridas?: string[]
+  etiquetasSugeridas?: TagItem[]
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────

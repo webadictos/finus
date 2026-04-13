@@ -347,6 +347,7 @@ export default function IngresoCard({ ingreso, cuentas }: Props) {
           ingresoId={ingreso.id}
           nombre={ingreso.nombre}
           montoEsperado={monto}
+          fechaEsperada={ingreso.fecha_esperada}
           esRecurrente={ingreso.es_recurrente}
           frecuencia={ingreso.frecuencia}
           cuentas={cuentas}

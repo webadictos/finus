@@ -6,6 +6,7 @@ import { LogOut, AlertTriangle, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import PasskeysSection from '@/components/configuracion/PasskeysSection'
 import { actualizarPerfil, cambiarPassword, resetearDatos } from '@/app/(dashboard)/configuracion/actions'
 import { logoutAction } from '@/app/(auth)/actions'
 
@@ -205,6 +206,10 @@ export default function ConfiguracionClient({ nombre, email }: Props) {
           </Button>
         </form>
       </section>
+
+      <div className="border-t" />
+
+      <PasskeysSection />
 
       <div className="border-t" />
 

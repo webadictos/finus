@@ -22,6 +22,7 @@ import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { eliminarGasto } from '@/app/(dashboard)/gastos/actions'
 import { formatMXN } from '@/lib/format'
+import { parseTags, type TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
@@ -58,6 +59,23 @@ const CATEGORIA_LABEL: Record<string, string> = {
   otro: 'Otro',
 }
 
+const SUBCATEGORIA_LABEL: Record<string, string> = {
+  restaurante: 'Restaurante',
+  cocina_propia: 'Cocina propia',
+  antojo: 'Antojo',
+  delivery: 'Delivery',
+  lleno: 'Lleno',
+  emergencia: 'Emergencia',
+}
+
+const MOMENTO_DEL_DIA_LABEL: Record<string, string> = {
+  desayuno: 'Desayuno',
+  almuerzo: 'Almuerzo',
+  cena: 'Cena',
+  snack: 'Snack',
+  sin_clasificar: 'Sin clasificar',
+}
+
 const FORMA_PAGO_LABEL: Record<string, string> = {
   efectivo: 'Efectivo',
   debito: 'Débito',
@@ -71,7 +89,7 @@ interface Props {
   tarjetaNombre?: string | null
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
-  etiquetasSugeridas?: string[]
+  etiquetasSugeridas?: TagItem[]
 }
 
 export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjetas, etiquetasSugeridas = [] }: Props) {
@@ -96,6 +114,7 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
 
   const descripcionLabel =
     transaccion.descripcion || CATEGORIA_LABEL[categoria] || categoria
+  const etiquetas = parseTags(transaccion.etiquetas)
 
   return (
     <>
@@ -108,6 +127,18 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
             <span className="text-sm font-medium truncate">{descripcionLabel}</span>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span>{CATEGORIA_LABEL[categoria] ?? categoria}</span>
+              {transaccion.subcategoria && (
+                <>
+                  <span>·</span>
+                  <span>{SUBCATEGORIA_LABEL[transaccion.subcategoria] ?? transaccion.subcategoria}</span>
+                </>
+              )}
+              {transaccion.momento_del_dia && (
+                <>
+                  <span>·</span>
+                  <span>{MOMENTO_DEL_DIA_LABEL[transaccion.momento_del_dia] ?? transaccion.momento_del_dia}</span>
+                </>
+              )}
               {transaccion.forma_pago && (
                 <>
                   <span>·</span>
@@ -123,11 +154,11 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
               <span>·</span>
               <span>{fechaDisplay}</span>
             </div>
-            {(transaccion as typeof transaccion & { etiquetas?: string[] | null }).etiquetas?.length ? (
+            {etiquetas.length > 0 ? (
               <div className="flex flex-wrap gap-1 mt-1">
-                {(transaccion as typeof transaccion & { etiquetas?: string[] | null }).etiquetas!.map((tag) => (
-                  <span key={tag} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                    {tag}
+                {etiquetas.map((tag) => (
+                  <span key={tag.slug} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" title={tag.slug}>
+                    {tag.label}
                   </span>
                 ))}
               </div>

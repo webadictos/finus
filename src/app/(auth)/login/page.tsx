@@ -66,6 +66,12 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? 'Entrando…' : 'Entrar'}
             </Button>
+            <div className="w-full rounded-xl border bg-muted/40 px-3 py-3 text-left text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Passkeys disponibles dentro de tu sesión</p>
+              <p className="mt-1">
+                Actívalas en Configuración para desbloquear Finus con Face ID, Touch ID o PIN después del login inicial.
+              </p>
+            </div>
             <p className="text-sm text-muted-foreground">
               ¿No tienes cuenta?{' '}
               <Link href="/register" className="text-foreground underline underline-offset-4 hover:text-primary">

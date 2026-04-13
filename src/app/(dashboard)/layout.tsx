@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import MobileNav from '@/components/dashboard/MobileNav'
+import DashboardShell from '@/components/dashboard/DashboardShell'
 import SidebarRegistrarGastoButton from '@/components/dashboard/SidebarRegistrarGastoButton'
 import {
   LayoutDashboard,
@@ -11,6 +11,7 @@ import {
   Target,
   Landmark,
   Settings,
+  ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: '/compromisos', label: 'Compromisos', icon: CreditCard },
   { href: '/cuentas', label: 'Cuentas', icon: Landmark },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
+  { href: '/presupuesto', label: 'Presupuesto', icon: ShieldCheck },
   { href: '/metas', label: 'Metas', icon: Target },
 ]
 
@@ -100,23 +102,9 @@ export default async function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile header */}
-        <header className="md:hidden flex items-center justify-between border-b bg-card px-4 py-3">
-          <Link href="/">
-            <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
-          </Link>
-          <Link href="/configuracion" className="p-1 text-muted-foreground hover:text-foreground">
-            <Settings className="size-5" />
-          </Link>
-        </header>
-
-        {/* pb-16 leaves space for the fixed mobile bottom nav */}
-        <main className="flex-1 overflow-auto p-4 pb-20 md:p-6 md:pb-6">{children}</main>
-
-        {/* Bottom nav — mobile (fixed, rendered via Client Component) */}
-        <MobileNav cuentas={cuentas} tarjetas={tarjetas} />
-      </div>
+      <DashboardShell cuentas={cuentas} tarjetas={tarjetas} email={email}>
+        {children}
+      </DashboardShell>
     </div>
   )
 }

@@ -22,13 +22,21 @@ interface Props {
   cargos: CargoLinea[]
   cuentas: Cuenta[]
   saldoDisponible: number
+  reservaOperativa?: number
 }
 
 type ItemVencimiento =
   | { kind: 'compromiso'; data: Compromiso; dias: number }
   | { kind: 'linea'; data: LineaCredito; dias: number }
 
-export default function AlertasVencimiento({ compromisos, lineas, cargos, cuentas, saldoDisponible }: Props) {
+export default function AlertasVencimiento({
+  compromisos,
+  lineas,
+  cargos,
+  cuentas,
+  saldoDisponible,
+  reservaOperativa = 0,
+}: Props) {
   const [pagarCompromisoId, setPagarCompromisoId] = useState<string | null>(null)
   const [pagarLineaId, setPagarLineaId] = useState<string | null>(null)
 
@@ -113,7 +121,7 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, cuenta
               fecha_proximo_pago: compromiso.fecha_proximo_pago,
               nombre: compromiso.nombre,
             }
-            const rec = getRecomendacion(input, saldoDisponible)
+            const rec = getRecomendacion(input, saldoDisponible, null, reservaOperativa)
 
             return (
               <div key={`c-${compromiso.id}`} className="flex flex-col gap-1.5">
@@ -161,7 +169,7 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, cuenta
               tasa_efectiva_anual: c.tasa_efectiva_anual != null ? Number(c.tasa_efectiva_anual) : null,
             })),
           }
-          const rec = getRecomendacionLinea(lineaInput, saldoDisponible)
+          const rec = getRecomendacionLinea(lineaInput, saldoDisponible, null, reservaOperativa)
 
           return (
             <div key={`l-${linea.id}`} className="flex flex-col gap-1.5">
@@ -222,7 +230,9 @@ export default function AlertasVencimiento({ compromisos, lineas, cargos, cuenta
               fecha_proximo_pago: compromisoActivo.fecha_proximo_pago,
               nombre: compromisoActivo.nombre,
             },
-            saldoDisponible
+            saldoDisponible,
+            null,
+            reservaOperativa
           )}
           cuentas={cuentas}
         />

@@ -16,9 +16,15 @@ interface Props {
   compromisos: Compromiso[]
   cuentas: Cuenta[]
   saldoDisponible: number
+  reservaOperativa?: number
 }
 
-export default function CompromisosVencidos({ compromisos, cuentas, saldoDisponible }: Props) {
+export default function CompromisosVencidos({
+  compromisos,
+  cuentas,
+  saldoDisponible,
+  reservaOperativa = 0,
+}: Props) {
   const [pagarOpen, setPagarOpen] = useState<string | null>(null)
 
   const hoy = new Date()
@@ -64,7 +70,7 @@ export default function CompromisosVencidos({ compromisos, cuentas, saldoDisponi
             fecha_proximo_pago: c.fecha_proximo_pago,
             nombre: c.nombre,
           }
-          const rec = getRecomendacion(input, saldoDisponible)
+          const rec = getRecomendacion(input, saldoDisponible, null, reservaOperativa)
           const montoPrincipal = Number(c.monto_mensualidad ?? c.pago_minimo ?? 0)
 
           return (

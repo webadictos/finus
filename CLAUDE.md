@@ -361,9 +361,13 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | fecha                         | date        |                                                        |
 | descripcion                   | text\|null  |                                                        |
 | categoria                     | text\|null  |                                                        |
+| **subcategoria**              | text\|null  | Ej: `restaurante \| cocina_propia \| antojo \| delivery` — ver sección Presupuesto Operativo |
+| **momento_del_dia**           | enum\|null  | `desayuno \| almuerzo \| cena \| snack \| sin_clasificar` — opcional, solo cuando aplica |
+| **etiquetas**                 | text[]\|null | Array de etiquetas libres definidas por el usuario    |
 | cuenta_id                     | uuid\|null  | FK → cuentas                                           |
 | tarjeta_id                    | uuid\|null  | FK → tarjetas                                          |
 | compromiso_id                 | uuid\|null  | FK → compromisos                                       |
+| proyecto_proveedor_id         | uuid\|null  | FK → proyecto_proveedores                              |
 | forma_pago                    | text\|null  |                                                        |
 | meses_msi                     | int\|null   |                                                        |
 | es_recurrente                 | boolean     |                                                        |
@@ -384,12 +388,35 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | activa                  | boolean     |
 | created_at / updated_at | timestamptz |
 
+### `presupuesto_operativo`
+
+| Columna                  | Tipo          | Notas                                                                                      |
+| ------------------------ | ------------- | ------------------------------------------------------------------------------------------ |
+| id                       | uuid PK       |                                                                                            |
+| usuario_id               | uuid FK       |                                                                                            |
+| categoria                | text          | `comida \| gasolina \| despensa \| snacks \| transporte \| salud \| varios`               |
+| subcategoria             | text\|null    | Refinamiento opcional: `restaurante`, `cocina_propia`, etc.                               |
+| frecuencia               | enum          | `diario \| semanal \| quincenal \| mensual`                                               |
+| **monto_manual**         | numeric\|null | Ingresado por el usuario — fuente inicial siempre                                         |
+| **monto_aprendido**      | numeric\|null | Calculado del historial de transacciones (promedio últimas 8 sem.)                        |
+| **fuente_activa**        | enum          | `manual \| aprendido` — cuál número usa Finus para calcular reserva                      |
+| **confianza**            | enum          | `baja \| media \| alta` — basado en semanas_de_datos                                     |
+| semanas_de_datos         | int           | Semanas con al menos 1 transacción registrada en esta categoría                           |
+| sugerencia_pendiente     | boolean       | TRUE cuando Finus detectó desviación >15% por 4+ semanas y aún no se acepta/ignora       |
+| monto_sugerido           | numeric\|null | El nuevo monto que Finus quiere proponer                                                  |
+| veces_ignorada           | int           | Si llega a 3, Finus no vuelve a sugerir esa partida automáticamente                      |
+| **activo**               | boolean       | ⚠️ Es `activo` (masculino)                                                                |
+| created_at / updated_at  | timestamptz   |                                                                                            |
+
 ### RPCs de Supabase
 
 ```sql
 -- Definidas con security definer; actualizan updated_at
 public.incrementar_saldo(p_cuenta_id uuid, p_monto numeric) → void
 public.decrementar_saldo(p_cuenta_id uuid, p_monto numeric) → void
+
+-- Calcula reserva operativa para los próximos N días
+public.calcular_reserva_operativa(p_usuario_id uuid, p_dias int) → numeric
 ```
 
 Tipadas en `database.ts` bajo `Functions` para que `.rpc()` no de error de TypeScript.
@@ -398,7 +425,12 @@ Tipadas en `database.ts` bajo `Functions` para que `.rpc()` no de error de TypeS
 
 ## Lógica de recomendaciones (`src/lib/recommendations.ts`)
 
-`getRecomendacion(compromiso, saldoDisponible, ingresoProximo?)` → `Recomendacion`
+`getRecomendacion(compromiso, saldoDisponible, ingresoProximo?, reservaOperativa?)` → `Recomendacion`
+
+> ⚠️ El parámetro `reservaOperativa` se agregó para que la recomendación corra contra
+> `saldoLibre = saldoDisponible - reservaOperativa` en lugar del saldo bruto.
+> Esto hace que Finus reserve automáticamente lo necesario para gastos básicos antes
+> de comprometer liquidez en pagos de deuda.
 
 **Factores de ponderación:**
 
@@ -423,6 +455,105 @@ rojo_fuerte(5) > rojo(4) > naranja(3) > morado(2) > amarillo(1) > verde(0)
 
 ---
 
+## Presupuesto Operativo y Gastos Hormiga
+
+### Filosofía
+
+Antes de decidir cuánto pagar de cada deuda, Finus reserva un **piso de subsistencia**: lo que el usuario necesita para operar en el período (comida, gasolina, despensa, snacks, etc.). Esta reserva se descuenta del saldo disponible antes de correr cualquier recomendación de pago.
+
+El objetivo secundario es hacer visibles los **gastos hormiga**: pequeños gastos recurrentes (cafés, antojos, delivery) que individualmente no duelen pero en conjunto pueden equivaler a la diferencia entre pagar el mínimo o liquidar una tarjeta. Finus los muestra con contexto financiero real, nunca con culpa ni regaño.
+
+### Las tres etapas de aprendizaje
+
+**Etapa 1 — Arranque manual** (día 0, sin historial)
+
+El usuario declara sus gastos básicos estimados por categoría y frecuencia. Finus usa estos números inmediatamente. Todos los registros nacen con `fuente_activa: 'manual'` y `confianza: 'baja'`.
+
+**Etapa 2 — Comparación silenciosa** (4–8 semanas)
+
+Conforme el usuario registra gastos, Finus acumula `monto_aprendido` promediando las últimas 8 semanas de transacciones por categoría. No muestra nada al usuario todavía. Internamente marca `sugerencia_pendiente = true` cuando detecta desviación >15% sostenida por 4+ semanas consecutivas.
+
+**Etapa 3 — Sugerencia no intrusiva** (cuando hay suficientes datos)
+
+Finus muestra una notificación en la vista de Presupuesto Operativo:
+
+> *"Llevo 6 semanas viendo tus gastos en comida. Tu gasto real es $1,840/semana, no $1,500. ¿Actualizo tu presupuesto operativo?"*
+
+El usuario puede: **Aceptar** (cambia `fuente_activa → 'aprendido'`, `confianza → 'alta'`), **Ajustar manualmente**, o **Ignorar** (incrementa `veces_ignorada`; al llegar a 3 Finus deja de sugerir esa partida).
+
+### Umbrales de confianza
+
+| `semanas_de_datos` | `confianza` | Comportamiento en recomendaciones                                  |
+| ------------------ | ----------- | ------------------------------------------------------------------ |
+| 0–3                | `baja`      | Usa `monto_manual` + margen de seguridad del 20%                  |
+| 4–7                | `media`     | Usa `monto_manual` sin margen adicional                           |
+| 8+                 | `alta`      | Usa `monto_aprendido` si `fuente_activa = 'aprendido'`, sin margen |
+
+### Función `calcularReservaOperativa` (`src/lib/presupuesto.ts`)
+
+```ts
+// Devuelve el monto a reservar para los próximos `dias` días
+// basado en las partidas activas del presupuesto_operativo del usuario
+export function calcularReservaOperativa(
+  partidas: PresupuestoOperativo[],
+  dias: number
+): number {
+  return partidas
+    .filter(p => p.activo)
+    .reduce((total, p) => {
+      const monto = p.fuente_activa === 'aprendido' && p.monto_aprendido
+        ? Number(p.monto_aprendido)
+        : Number(p.monto_manual ?? 0)
+      const margen = p.confianza === 'baja' ? 1.2 : 1.0
+      const factor = p.frecuencia === 'diario'    ? dias
+                   : p.frecuencia === 'semanal'   ? dias / 7
+                   : p.frecuencia === 'quincenal' ? dias / 15
+                   : dias / 30  // mensual
+      return total + (monto * margen * factor)
+    }, 0)
+}
+```
+
+### Cómo se integra en el Dashboard
+
+El `saldoLibre` que usa `getRecomendacion()` se calcula así:
+
+```ts
+const reserva = calcularReservaOperativa(partidas, diasHastaVencimiento)
+const saldoLibre = saldoDisponible - reserva
+const rec = getRecomendacion(compromiso, saldoLibre, ingresoProximo)
+```
+
+El dashboard muestra un KPI adicional: **"Reserva operativa"** con el monto calculado para los próximos 7 días, para que el usuario entienda por qué su liquidez real es menor que su saldo bruto.
+
+### Clasificación granular de gastos (para detección de hormiga)
+
+Los campos `subcategoria` y `momento_del_dia` en `transacciones` permiten análisis granular:
+
+| `categoria` | `subcategoria` ejemplos                              | `momento_del_dia`               |
+| ----------- | ---------------------------------------------------- | ------------------------------- |
+| `comida`    | `restaurante`, `cocina_propia`, `antojo`, `delivery` | `desayuno \| almuerzo \| cena \| snack` |
+| `gasolina`  | `lleno`, `emergencia`                                | —                               |
+| `despensa`  | `supermercado`, `mercado`, `tienda`                  | —                               |
+| `snacks`    | `cafe`, `antojo_dulce`, `botana`                     | `desayuno \| snack`             |
+
+**Reglas de captura en el form de gastos:**
+- `subcategoria` y `momento_del_dia` son **siempre opcionales** — nunca bloquear el guardado si no se llenan
+- Cuando `categoria = 'comida'`, el form muestra los campos opcionales de subcategoría y momento del día
+- El bot de Telegram puede inferir el momento por la hora del mensaje (antes de las 11am → desayuno, etc.)
+- Con el tiempo, Finus pre-sugiere la subcategoría más frecuente del usuario a esa hora del día
+
+**Análisis de gastos hormiga** (`src/lib/presupuesto.ts → detectarGastosHormiga()`):
+
+Agrupa transacciones del mes por `categoria + subcategoria` y calcula:
+- Suma del mes vs. promedio de los 3 meses anteriores
+- Equivalencia en términos de deuda: *"tus antojos este mes = la diferencia entre pagar el corte o el mínimo de Stori"*
+- Tendencia: si el gasto hormiga está subiendo o bajando respecto al mes anterior
+
+El análisis es **descriptivo, nunca punitivo**. Finus presenta el número con contexto, no con un semáforo de "excediste tu presupuesto".
+
+---
+
 ## Decisiones técnicas y por qué
 
 | Decisión                                             | Razón                                                                                           |
@@ -437,6 +568,9 @@ rojo_fuerte(5) > rojo(4) > naranja(3) > morado(2) > amarillo(1) > verde(0)
 | Streaming para `/api/aconsejame`                     | Respuestas de Claude tardan 5-10s; streaming mejora UX notablemente                             |
 | `claude-haiku-4-5-20251001` para Aconséjame          | Rápido y económico para análisis prescriptivo; max_tokens: 1000                                 |
 | No actualizar saldo de tarjetas                      | La lógica de saldo de tarjetas es más compleja (ciclo de corte); se deja como trabajo pendiente |
+| `subcategoria` y `momento_del_dia` opcionales en transacciones | Nunca bloquear el registro de un gasto por campos de análisis; la captura granular es progresiva |
+| `presupuesto_operativo` arranca con datos manuales   | Sin historial en el día 0, el sistema no puede aprender; la captura manual es el bootstrap necesario |
+| RPC `calcular_reserva_operativa` en DB               | Permite al dashboard calcular la reserva en una sola llamada sin traer todas las partidas al cliente |
 
 ---
 
@@ -480,6 +614,7 @@ Fix: renombrar `src/middleware.ts` → `src/proxy.ts` y el export `middleware` �
 - `tarjetas` → `activa` (femenino) → `.eq('activa', true)`
 - `compromisos` → `activo` (masculino) → `.eq('activo', true)`
 - `gastos_previstos` → `activo` (masculino) → `.eq('activo', true)`
+- `presupuesto_operativo` → `activo` (masculino) → `.eq('activo', true)`
 
 ### 10. Error TypeScript en `.rpc()` con `[_ in never]`
 
@@ -529,12 +664,15 @@ Sin tests automatizados ni Storybook. El flujo de verificación es: `tsc --noEmi
 
 - **Vista Metas** (`/metas`) — actualmente es un `<h1>Metas</h1>`. Necesita CRUD, barra de progreso hacia el objetivo, y conexión con cuentas de ahorro/inversión.
 - **Configuración de cuentas y tarjetas** — no hay UI para agregar/editar cuentas ni tarjetas. El usuario de prueba las tiene insertadas directamente en Supabase.
+- **Vista Presupuesto Operativo** (`/presupuesto`) — nueva vista. Ver sección "Presupuesto Operativo y Gastos Hormiga" para spec completo.
 
 ### Media prioridad
 
 - **Actualizar saldo de tarjetas al gastar** — al registrar un gasto con `credito_revolvente` o `msi`, se crea la transacción pero `tarjetas.saldo_actual` no se modifica. Solo se actualiza `cuentas.saldo_actual` cuando la forma de pago es débito/efectivo.
 - **Eliminar / editar transacciones** — en `/gastos` no hay botón de editar ni eliminar un registro ya creado.
-- **Filtros en /gastos** — solo muestra el mes actual; falta filtro por período y por categoría.
+- **Filtros en /gastos** — solo muestra el mes actual; falta filtro por período, categoría, subcategoría y etiqueta.
+- **KPI de reserva operativa en dashboard** — mostrar cuánto está reservado para gastos básicos en los próximos 7 días junto al saldo disponible.
+- **Análisis de gastos hormiga** — agregar panel en `/gastos` o `/presupuesto` con desglose por subcategoría y comparativa mes anterior.
 
 ### Baja prioridad
 
@@ -542,6 +680,7 @@ Sin tests automatizados ni Storybook. El flujo de verificación es: `tsc --noEmi
 - Notificaciones push o email para vencimientos próximos
 - Export a CSV
 - Los endpoints `src/app/api/supabase/compromisos/route.ts` e `ingresos/route.ts` son placeholders vacíos que devuelven 501
+- Job nocturno para recalcular `monto_aprendido` y detectar `sugerencia_pendiente` en `presupuesto_operativo`
 
 ---
 

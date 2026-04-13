@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
 import MontoInput from '@/components/ui/MontoInput'
 import TagInput from '@/components/ui/TagInput'
+import { parseTags, type TagItem } from '@/lib/tags'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
 
@@ -39,17 +40,40 @@ const FORMA_PAGO_OPTIONS = [
   { value: 'prestamo', label: 'Préstamo' },
 ]
 
+const SUBCATEGORIA_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
+  comida: [
+    { value: 'restaurante', label: 'Restaurante' },
+    { value: 'cocina_propia', label: 'Cocina propia' },
+    { value: 'antojo', label: 'Antojo' },
+    { value: 'delivery', label: 'Delivery' },
+  ],
+  gasolina: [
+    { value: 'lleno', label: 'Lleno' },
+    { value: 'emergencia', label: 'Emergencia' },
+  ],
+}
+
+const MOMENTO_DEL_DIA_OPTIONS = [
+  { value: 'desayuno', label: 'Desayuno' },
+  { value: 'almuerzo', label: 'Almuerzo' },
+  { value: 'cena', label: 'Cena' },
+  { value: 'snack', label: 'Snack' },
+  { value: 'sin_clasificar', label: 'Sin clasificar' },
+]
+
 interface FormState {
   monto: string
   descripcion: string
   categoria: string
+  subcategoria: string
+  momento_del_dia: string
   forma_pago: string
   cuenta_id: string
   tarjeta_id: string
   meses_msi: string
   fecha: string
   notas: string
-  etiquetas: string[]
+  etiquetas: TagItem[]
 }
 
 function todayISO() {
@@ -65,6 +89,8 @@ function initialForm(tx?: Transaccion | null): FormState {
       monto: '',
       descripcion: '',
       categoria: 'otro',
+      subcategoria: '',
+      momento_del_dia: '',
       forma_pago: 'efectivo',
       cuenta_id: '',
       tarjeta_id: '',
@@ -78,13 +104,15 @@ function initialForm(tx?: Transaccion | null): FormState {
     monto: String(Number(tx.monto ?? 0)),
     descripcion: tx.descripcion ?? '',
     categoria: tx.categoria ?? 'otro',
+    subcategoria: tx.subcategoria ?? '',
+    momento_del_dia: tx.momento_del_dia ?? '',
     forma_pago: tx.forma_pago ?? 'efectivo',
     cuenta_id: tx.cuenta_id ?? '',
     tarjeta_id: tx.tarjeta_id ?? '',
     meses_msi: tx.meses_msi != null ? String(tx.meses_msi) : '',
     fecha: tx.fecha.slice(0, 10),
     notas: tx.notas ?? '',
-    etiquetas: (tx as Transaccion & { etiquetas?: string[] | null }).etiquetas ?? [],
+    etiquetas: parseTags(tx.etiquetas),
   }
 }
 
@@ -94,7 +122,7 @@ interface Props {
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
   /** Etiquetas existentes para sugerir en autocomplete */
-  etiquetasSugeridas?: string[]
+  etiquetasSugeridas?: TagItem[]
   /** Si se pasa, el form entra en modo edición */
   transaccion?: Transaccion | null
   /** Llamado tras guardar exitosamente un nuevo gasto */
@@ -185,6 +213,9 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
   const needsCuenta = form.forma_pago === 'efectivo' || form.forma_pago === 'debito'
   const needsTarjeta = form.forma_pago === 'credito_revolvente' || form.forma_pago === 'msi'
   const needsMsi = form.forma_pago === 'msi'
+  const subcategoriasDisponibles = SUBCATEGORIA_OPTIONS[form.categoria] ?? []
+  const showSubcategoria = subcategoriasDisponibles.length > 0
+  const showMomentoDelDia = form.categoria === 'comida'
 
   // Filtrar cuentas según la forma de pago seleccionada
   const cuentasFiltradas = useMemo(() => {
@@ -212,6 +243,21 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
     })
   }
 
+  const handleCategoriaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const categoria = e.target.value
+    setForm((p) => {
+      const subcategorias = SUBCATEGORIA_OPTIONS[categoria] ?? []
+      const subcategoriaSigueValida = subcategorias.some((item) => item.value === p.subcategoria)
+
+      return {
+        ...p,
+        categoria,
+        subcategoria: subcategoriaSigueValida ? p.subcategoria : '',
+        momento_del_dia: categoria === 'comida' ? p.momento_del_dia : '',
+      }
+    })
+  }
+
   const selectClass =
     'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
 
@@ -221,12 +267,16 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
         <Dialog.Content
           className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col bg-background shadow-xl overflow-hidden focus:outline-none data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right duration-300"
-          aria-describedby={undefined}
         >
           <div className="flex items-center justify-between border-b px-5 py-4">
-            <Dialog.Title className="text-base font-semibold">
-              {isEditing ? 'Editar gasto' : 'Registrar gasto'}
-            </Dialog.Title>
+            <div>
+              <Dialog.Title className="text-base font-semibold">
+                {isEditing ? 'Editar gasto' : 'Registrar gasto'}
+              </Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                Registra el gasto y agrega clasificacion opcional por subcategoria y momento del dia.
+              </Dialog.Description>
+            </div>
             <Dialog.Close asChild>
               <Button variant="ghost" size="icon">
                 <X className="size-4" />
@@ -263,7 +313,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                 <select
                   id="g-cat"
                   value={form.categoria}
-                  onChange={set('categoria')}
+                  onChange={handleCategoriaChange}
                   className={selectClass}
                 >
                   {CATEGORIA_OPTIONS.map((o) => (
@@ -273,6 +323,48 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                   ))}
                 </select>
               </div>
+
+              {showSubcategoria && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="g-subcat">
+                    Subcategoría <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </Label>
+                  <select
+                    id="g-subcat"
+                    value={form.subcategoria}
+                    onChange={set('subcategoria')}
+                    className={selectClass}
+                  >
+                    <option value="">— Sin clasificar —</option>
+                    {subcategoriasDisponibles.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {showMomentoDelDia && (
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="g-momento">
+                    Momento del día <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </Label>
+                  <select
+                    id="g-momento"
+                    value={form.momento_del_dia}
+                    onChange={set('momento_del_dia')}
+                    className={selectClass}
+                  >
+                    <option value="">— Sin clasificar —</option>
+                    {MOMENTO_DEL_DIA_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="g-fp">Forma de pago</Label>

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import type { Json } from '@/types/database'
 
 export type ActionResult = { error?: string }
 
@@ -11,6 +12,8 @@ export type RegistrarGastoResult = {
   previstosCoincidentes?: PrevistoBasico[]
   transaccionId?: string
 }
+
+type MomentoDelDia = 'desayuno' | 'almuerzo' | 'cena' | 'snack' | 'sin_clasificar'
 
 export async function registrarGasto(formData: FormData): Promise<RegistrarGastoResult> {
   const supabase = await createClient()
@@ -24,10 +27,11 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
   const tarjetaId = (formData.get('tarjeta_id') as string) || null
   const mesesMsi = formData.get('meses_msi')
   const fecha = (formData.get('fecha') as string) || new Date().toISOString().split('T')[0]
+  const momentoDelDia = ((formData.get('momento_del_dia') as MomentoDelDia | null) || null)
 
   const monto = parseFloat(formData.get('monto') as string) || 0
 
-  let etiquetas: string[] | null = null
+  let etiquetas: Json | null = null
   try {
     const raw = formData.get('etiquetas') as string
     if (raw) etiquetas = JSON.parse(raw)
@@ -42,12 +46,14 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
       fecha,
       descripcion: ((formData.get('descripcion') as string) || '').trim() || null,
       categoria: (formData.get('categoria') as string) || null,
+      subcategoria: ((formData.get('subcategoria') as string) || '').trim() || null,
+      momento_del_dia: momentoDelDia,
       forma_pago: formaPago || null,
       cuenta_id: ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null,
       tarjeta_id: ['credito_revolvente', 'msi'].includes(formaPago) ? tarjetaId : null,
       meses_msi: formaPago === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
       notas: ((formData.get('notas') as string) || '').trim() || null,
-      etiquetas: etiquetas && etiquetas.length > 0 ? etiquetas : null,
+      etiquetas: Array.isArray(etiquetas) && etiquetas.length > 0 ? etiquetas : null,
       es_recurrente: false,
     })
     .select('id')
@@ -113,8 +119,9 @@ export async function actualizarGasto(
     ? (formData.get('tarjeta_id') as string) || null
     : null
   const mesesMsi = formData.get('meses_msi')
+  const momentoDelDiaNuevo = ((formData.get('momento_del_dia') as MomentoDelDia | null) || null)
 
-  let etiquetasActualizar: string[] | null = null
+  let etiquetasActualizar: Json | null = null
   try {
     const raw = formData.get('etiquetas') as string
     if (raw) etiquetasActualizar = JSON.parse(raw)
@@ -128,12 +135,14 @@ export async function actualizarGasto(
       fecha: (formData.get('fecha') as string) || new Date().toISOString().split('T')[0],
       descripcion: ((formData.get('descripcion') as string) || '').trim() || null,
       categoria: (formData.get('categoria') as string) || null,
+      subcategoria: ((formData.get('subcategoria') as string) || '').trim() || null,
+      momento_del_dia: momentoDelDiaNuevo,
       forma_pago: formaPagoNueva || null,
       cuenta_id: cuentaIdNueva,
       tarjeta_id: tarjetaIdNueva,
       meses_msi: formaPagoNueva === 'msi' && mesesMsi ? parseInt(mesesMsi as string) : null,
       notas: ((formData.get('notas') as string) || '').trim() || null,
-      etiquetas: etiquetasActualizar && etiquetasActualizar.length > 0 ? etiquetasActualizar : null,
+      etiquetas: Array.isArray(etiquetasActualizar) && etiquetasActualizar.length > 0 ? etiquetasActualizar : null,
     })
     .eq('id', id)
     .eq('usuario_id', user.id)

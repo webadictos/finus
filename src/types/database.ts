@@ -397,6 +397,8 @@ export interface Database {
           fecha: string
           descripcion: string | null
           categoria: string | null
+          subcategoria: string | null
+          momento_del_dia: 'desayuno' | 'almuerzo' | 'cena' | 'snack' | 'sin_clasificar' | null
           cuenta_id: string | null
           tarjeta_id: string | null
           compromiso_id: string | null
@@ -405,7 +407,7 @@ export interface Database {
           meses_msi: number | null
           es_recurrente: boolean
           notas: string | null
-          etiquetas: string[] | null
+          etiquetas: Json | null
           created_at: string
         }
         Insert: {
@@ -416,6 +418,8 @@ export interface Database {
           fecha: string
           descripcion?: string | null
           categoria?: string | null
+          subcategoria?: string | null
+          momento_del_dia?: 'desayuno' | 'almuerzo' | 'cena' | 'snack' | 'sin_clasificar' | null
           cuenta_id?: string | null
           tarjeta_id?: string | null
           compromiso_id?: string | null
@@ -424,7 +428,7 @@ export interface Database {
           meses_msi?: number | null
           es_recurrente?: boolean
           notas?: string | null
-          etiquetas?: string[] | null
+          etiquetas?: Json | null
           created_at?: string
         }
         Update: {
@@ -435,6 +439,8 @@ export interface Database {
           fecha?: string
           descripcion?: string | null
           categoria?: string | null
+          subcategoria?: string | null
+          momento_del_dia?: 'desayuno' | 'almuerzo' | 'cena' | 'snack' | 'sin_clasificar' | null
           cuenta_id?: string | null
           tarjeta_id?: string | null
           compromiso_id?: string | null
@@ -443,7 +449,7 @@ export interface Database {
           meses_msi?: number | null
           es_recurrente?: boolean
           notas?: string | null
-          etiquetas?: string[] | null
+          etiquetas?: Json | null
         }
         Relationships: Rel[]
       }
@@ -841,6 +847,89 @@ export interface Database {
         }
         Relationships: Rel[]
       }
+      presupuesto_operativo: {
+        Row: {
+          id: string
+          usuario_id: string
+          categoria:
+            | 'comida'
+            | 'gasolina'
+            | 'despensa'
+            | 'entretenimiento'
+            | 'mascotas'
+            | 'snacks'
+            | 'transporte'
+            | 'salud'
+            | 'varios'
+          subcategoria: string | null
+          frecuencia: 'diario' | 'semanal' | 'quincenal' | 'mensual'
+          monto_manual: number | null
+          monto_aprendido: number | null
+          fuente_activa: 'manual' | 'aprendido'
+          confianza: 'baja' | 'media' | 'alta'
+          semanas_de_datos: number
+          sugerencia_pendiente: boolean
+          monto_sugerido: number | null
+          veces_ignorada: number
+          activo: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          categoria:
+            | 'comida'
+            | 'gasolina'
+            | 'despensa'
+            | 'entretenimiento'
+            | 'mascotas'
+            | 'snacks'
+            | 'transporte'
+            | 'salud'
+            | 'varios'
+          subcategoria?: string | null
+          frecuencia: 'diario' | 'semanal' | 'quincenal' | 'mensual'
+          monto_manual?: number | null
+          monto_aprendido?: number | null
+          fuente_activa?: 'manual' | 'aprendido'
+          confianza?: 'baja' | 'media' | 'alta'
+          semanas_de_datos?: number
+          sugerencia_pendiente?: boolean
+          monto_sugerido?: number | null
+          veces_ignorada?: number
+          activo?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          categoria?:
+            | 'comida'
+            | 'gasolina'
+            | 'despensa'
+            | 'entretenimiento'
+            | 'mascotas'
+            | 'snacks'
+            | 'transporte'
+            | 'salud'
+            | 'varios'
+          subcategoria?: string | null
+          frecuencia?: 'diario' | 'semanal' | 'quincenal' | 'mensual'
+          monto_manual?: number | null
+          monto_aprendido?: number | null
+          fuente_activa?: 'manual' | 'aprendido'
+          confianza?: 'baja' | 'media' | 'alta'
+          semanas_de_datos?: number
+          sugerencia_pendiente?: boolean
+          monto_sugerido?: number | null
+          veces_ignorada?: number
+          activo?: boolean
+          updated_at?: string
+        }
+        Relationships: Rel[]
+      }
     }
     Views: {
       [_ in never]: {
@@ -868,6 +957,10 @@ export interface Database {
       decrementar_saldo_linea: {
         Args: { p_linea_id: string; p_monto: number }
         Returns: void
+      }
+      calcular_reserva_operativa: {
+        Args: { p_usuario_id: string; p_dias: number }
+        Returns: number
       }
     }
     Enums: {

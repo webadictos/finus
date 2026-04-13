@@ -14,6 +14,7 @@ interface Props {
   ingresos: Ingreso[]
   compromisos: Compromiso[]
   lineas: LineaCredito[]
+  reservaOperativa: number
 }
 
 function calcularPagoMinimo(c: Compromiso): number {
@@ -76,7 +77,7 @@ function KPICard({ label, value, sublabel, icon, colorClass = 'text-foreground',
   )
 }
 
-export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Props) {
+export default function KPICards({ cuentas, ingresos, compromisos, lineas, reservaOperativa }: Props) {
   const hoy = new Date()
   const en15dias = new Date(hoy)
   en15dias.setDate(en15dias.getDate() + 15)
@@ -146,14 +147,15 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
     })
     .reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
 
-  const proyeccion15 = disponible + ingresosProx15 - compromisosProx15 - lineasProx15
+  const proyeccion15 =
+    disponible + ingresosProx15 - compromisosProx15 - lineasProx15 - reservaOperativa
 
   const scrollAProximosIngresos = () => {
     document.getElementById('proximos-ingresos')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
       <KPICard
         label="Por recibir"
         value={formatMXN(porRecibir)}
@@ -176,9 +178,16 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas }: Pro
         colorClass="text-orange-500"
       />
       <KPICard
+        label="Reserva operativa"
+        value={formatMXN(reservaOperativa)}
+        sublabel="Próximos 7 días"
+        icon={<Calendar className="size-4 text-sky-600" />}
+        colorClass="text-sky-600"
+      />
+      <KPICard
         label="Proyección 15 días"
         value={formatMXN(proyeccion15)}
-        sublabel="Ingresos prob. − compromisos"
+        sublabel="Ingresos prob. − pagos − reserva"
         icon={<Calendar className="size-4" />}
         colorClass={proyeccion15 >= 0 ? 'text-emerald-500' : 'text-destructive'}
       />

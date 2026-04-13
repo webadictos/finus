@@ -8,6 +8,8 @@ import ProximosGastosPrevistos from '@/components/dashboard/ProximosGastosPrevis
 import CompromisosVencidos from '@/components/dashboard/CompromisosVencidos'
 import NuevaTransferenciaButton from '@/components/cuentas/NuevaTransferenciaButton'
 import ObtenerLiquidezButton from '@/components/dashboard/ObtenerLiquidezButton'
+import { getProjectedRecurringIngresos } from '@/lib/ingresos'
+import { calcularReservaOperativa } from '@/lib/presupuesto'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -16,6 +18,7 @@ type Compromiso = Database['public']['Tables']['compromisos']['Row']
 type GastoPrevisto = Database['public']['Tables']['gastos_previstos']['Row']
 type LineaCredito = Database['public']['Tables']['lineas_credito']['Row']
 type CargoLinea = Database['public']['Tables']['cargos_linea']['Row']
+type PresupuestoOperativo = Database['public']['Tables']['presupuesto_operativo']['Row']
 
 // Esqueleto simple reutilizable para Suspense
 function CardSkeleton({ className = '' }: { className?: string }) {
@@ -27,39 +30,10 @@ function CardSkeleton({ className = '' }: { className?: string }) {
   )
 }
 
-/**
- * Calcula la siguiente fecha de un ingreso recurrente confirmado.
- * Devuelve null si no aplica.
- */
-function calcularProximaFecha(ingreso: Ingreso): Date | null {
-  if (!ingreso.es_recurrente || !ingreso.frecuencia) return null
-  const baseStr = ingreso.fecha_real ?? ingreso.fecha_esperada
-  if (!baseStr) return null
-  const base = new Date(baseStr + 'T00:00:00')
-  const proxima = new Date(base)
-  switch (ingreso.frecuencia) {
-    case 'quincenal':
-      proxima.setDate(proxima.getDate() + 15)
-      break
-    case 'mensual':
-      proxima.setMonth(proxima.getMonth() + 1)
-      break
-    case 'semanal':
-      proxima.setDate(proxima.getDate() + 7)
-      break
-    case 'anual':
-      proxima.setFullYear(proxima.getFullYear() + 1)
-      break
-    default:
-      return null
-  }
-  return proxima
-}
-
 async function DashboardData() {
   const supabase = await createClient()
 
-  const [cuentasRes, ingresosRes, compromisosRes, gastosPrevistoRes, lineasRes, cargosRes] = await Promise.all([
+  const [cuentasRes, ingresosRes, compromisosRes, gastosPrevistoRes, lineasRes, cargosRes, presupuestoRes] = await Promise.all([
     supabase
       .from('cuentas')
       .select('*')
@@ -89,6 +63,10 @@ async function DashboardData() {
       .from('cargos_linea')
       .select('*')
       .eq('activo', true),
+    supabase
+      .from('presupuesto_operativo')
+      .select('*')
+      .eq('activo', true),
   ])
 
   const cuentas: Cuenta[] = cuentasRes.data ?? []
@@ -97,6 +75,8 @@ async function DashboardData() {
   const gastosPrevistos: GastoPrevisto[] = gastosPrevistoRes.data ?? []
   const lineas: LineaCredito[] = lineasRes.data ?? []
   const cargos: CargoLinea[] = cargosRes.data ?? []
+  const partidas: PresupuestoOperativo[] = presupuestoRes.data ?? []
+  const reservaOperativa = calcularReservaOperativa(partidas, 7)
 
   // Ingresos confirmados sin cuenta_destino_id: no llamaron incrementar_saldo,
   // por lo que no están reflejados en cuentas.saldo_actual.
@@ -108,55 +88,15 @@ async function DashboardData() {
     .filter((c) => c.tipo !== 'inversion')
     .reduce((sum, c) => sum + Number(c.saldo_actual ?? 0), 0) + ingresosSinCuenta
 
-  // Generar instancias futuras para ingresos recurrentes confirmados
-  // cuya siguiente ocurrencia aún no existe en la DB y cae en los próximos 30 días.
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const en30dias = new Date(hoy)
-  en30dias.setDate(hoy.getDate() + 30)
-
-  // Agrupar confirmados recurrentes por nombre → tomar el más reciente
-  const ultimoPorNombre = new Map<string, Ingreso>()
-  ingresos
-    .filter((i) => i.estado === 'confirmado' && i.es_recurrente)
-    .forEach((i) => {
-      const prev = ultimoPorNombre.get(i.nombre)
-      const fechaI = i.fecha_real ?? i.fecha_esperada ?? ''
-      const fechaPrev = prev ? (prev.fecha_real ?? prev.fecha_esperada ?? '') : ''
-      if (!prev || fechaI > fechaPrev) {
-        ultimoPorNombre.set(i.nombre, i)
-      }
-    })
-
-  // Ingresos no confirmados ya existentes en la DB (para evitar duplicados)
-  const ingresosNoConfirmados = ingresos.filter((i) => i.estado !== 'confirmado')
-
-  const phantoms: Ingreso[] = []
-  for (const i of ultimoPorNombre.values()) {
-    const proxima = calcularProximaFecha(i)
-    if (!proxima || proxima < hoy || proxima > en30dias) continue
-    const proximaStr = proxima.toISOString().split('T')[0]
-    // No generar si ya existe un ingreso con mismo nombre y fecha próxima
-    const yaExiste = ingresosNoConfirmados.some(
-      (j) => j.nombre === i.nombre && j.fecha_esperada === proximaStr
-    )
-    if (yaExiste) continue
-    phantoms.push({
-      ...i,
-      id: `${i.id}_next`,
-      fecha_esperada: proximaStr,
-      fecha_real: null,
-      estado: 'esperado',
-      monto_real: null,
-    })
-  }
-
-  const ingresosConRecurrentes = [...ingresos, ...phantoms]
+  const ingresosConRecurrentes = [
+    ...ingresos,
+    ...getProjectedRecurringIngresos(ingresos),
+  ]
 
   return (
     <>
       <SaldoHeader cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
-      <KPICards cuentas={cuentas} ingresos={ingresosConRecurrentes} compromisos={compromisos} lineas={lineas} />
+      <KPICards cuentas={cuentas} ingresos={ingresosConRecurrentes} compromisos={compromisos} lineas={lineas} reservaOperativa={reservaOperativa} />
       <div className="flex gap-2 flex-wrap">
         <ObtenerLiquidezButton lineas={lineas} cuentas={cuentas.filter((c) => c.tipo !== 'inversion')} />
         {cuentas.length >= 2 && (
@@ -168,8 +108,20 @@ async function DashboardData() {
         )}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <CompromisosVencidos compromisos={compromisos} cuentas={cuentas} saldoDisponible={saldoDisponible} />
-        <AlertasVencimiento compromisos={compromisos} lineas={lineas} cargos={cargos} cuentas={cuentas} saldoDisponible={saldoDisponible} />
+        <CompromisosVencidos
+          compromisos={compromisos}
+          cuentas={cuentas}
+          saldoDisponible={saldoDisponible}
+          reservaOperativa={reservaOperativa}
+        />
+        <AlertasVencimiento
+          compromisos={compromisos}
+          lineas={lineas}
+          cargos={cargos}
+          cuentas={cuentas}
+          saldoDisponible={saldoDisponible}
+          reservaOperativa={reservaOperativa}
+        />
         <div id="proximos-ingresos">
           <ProximosIngresos ingresos={ingresosConRecurrentes} cuentas={cuentas} />
         </div>
