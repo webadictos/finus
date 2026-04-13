@@ -95,7 +95,7 @@ export default function ProximosIngresos({ ingresos, cuentas }: Props) {
                 <span className="text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                   {formatMXN(Number(ingreso.monto_esperado ?? 0))}
                 </span>
-                {ingreso.estado !== 'confirmado' && !ingreso.id.endsWith('_next') && (
+                {ingreso.estado !== 'confirmado' && (
                   <ConfirmarIngresoButton ingreso={ingreso} cuentas={cuentas} />
                 )}
               </div>

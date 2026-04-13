@@ -288,6 +288,75 @@ export async function deshacerConfirmarIngreso(
   return {}
 }
 
+/**
+ * Confirma una instancia "fantasma" (_next) de un ingreso recurrente.
+ * Crea el registro real en DB si aún no existe, luego lo confirma.
+ */
+export async function confirmarIngresoPhantom(
+  originalId: string,
+  fechaEsperada: string,
+  montoReal: number,
+  fechaReal: string,
+  cuentaIdOverride?: string | null
+): Promise<ConfirmarIngresoResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  // Obtener el ingreso original para heredar todos los campos recurrentes
+  const { data: original, error: fetchErr } = await supabase
+    .from('ingresos')
+    .select('*')
+    .eq('id', originalId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchErr || !original) return { error: 'Ingreso original no encontrado' }
+
+  // Verificar si ya existe un registro pendiente con la misma fecha (evita duplicados)
+  const { data: existente } = await supabase
+    .from('ingresos')
+    .select('id')
+    .eq('usuario_id', user.id)
+    .eq('nombre', original.nombre)
+    .eq('fecha_esperada', fechaEsperada)
+    .neq('estado', 'confirmado')
+    .maybeSingle()
+
+  let realId: string
+  if (existente) {
+    realId = existente.id
+  } else {
+    // Insertar el registro real de la siguiente instancia
+    const { data: inserted, error: insertErr } = await supabase
+      .from('ingresos')
+      .insert({
+        usuario_id: user.id,
+        nombre: original.nombre,
+        tipo: original.tipo,
+        es_recurrente: true,
+        frecuencia: original.frecuencia,
+        dia_del_mes: original.dia_del_mes,
+        monto_fijo: original.monto_fijo,
+        monto_esperado: original.monto_fijo ?? original.monto_esperado,
+        fecha_esperada: fechaEsperada,
+        estado: 'esperado' as const,
+        probabilidad: original.probabilidad ?? 'alta',
+        cuenta_destino_id: cuentaIdOverride ?? original.cuenta_destino_id,
+      })
+      .select('id')
+      .single()
+
+    if (insertErr || !inserted) return { error: 'No se pudo crear la instancia' }
+    realId = inserted.id
+  }
+
+  // Delegar al flujo normal de confirmación
+  return confirmarIngreso(realId, montoReal, fechaReal, cuentaIdOverride)
+}
+
 export async function eliminarIngreso(
   id: string,
   alcance: 'este_mes' | 'todos_siguientes'

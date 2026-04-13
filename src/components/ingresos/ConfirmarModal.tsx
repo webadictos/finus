@@ -6,7 +6,7 @@ import { X, CheckCircle, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { confirmarIngreso } from '@/app/(dashboard)/ingresos/actions'
+import { confirmarIngreso, confirmarIngresoPhantom } from '@/app/(dashboard)/ingresos/actions'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
@@ -25,6 +25,8 @@ interface Props {
   cuentas: Cuenta[]
   /** FK actual del ingreso — null significa que no tiene cuenta asignada todavía */
   cuentaDestinoId?: string | null
+  /** Para instancias fantasma (_next): fecha esperada de la siguiente quincena */
+  fechaEsperada?: string | null
   onSuccess?: (data: {
     transaccionId: string
     nextIngresoId: string | null
@@ -43,8 +45,11 @@ export default function ConfirmarModal({
   frecuencia,
   cuentas,
   cuentaDestinoId,
+  fechaEsperada,
   onSuccess,
 }: Props) {
+  const isPhantom = ingresoId.endsWith('_next')
+  const originalId = isPhantom ? ingresoId.slice(0, -5) : ingresoId
   const today = new Date().toISOString().split('T')[0]
   const [monto, setMonto] = useState(String(montoEsperado))
   const [fecha, setFecha] = useState(today)
@@ -96,14 +101,12 @@ export default function ConfirmarModal({
   const ejecutarConfirmar = () => {
     const val = parseFloat(monto)
     const efectivaCuentaId = hasCuenta ? cuentaDestinoId! : selectedCuentaId
+    const cuentaOverride = hasCuenta ? undefined : efectivaCuentaId
 
     startTransition(async () => {
-      const result = await confirmarIngreso(
-        ingresoId,
-        val,
-        fecha,
-        hasCuenta ? undefined : efectivaCuentaId
-      )
+      const result = isPhantom && fechaEsperada
+        ? await confirmarIngresoPhantom(originalId, fechaEsperada, val, fecha, cuentaOverride)
+        : await confirmarIngreso(ingresoId, val, fecha, cuentaOverride)
       setConfirmOpen(false)
       if (result.error) {
         setError(result.error)

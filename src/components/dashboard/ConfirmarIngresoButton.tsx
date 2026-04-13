@@ -41,6 +41,7 @@ export function ConfirmarIngresoButton({ ingreso, cuentas, className }: Props) {
         frecuencia={ingreso.frecuencia}
         cuentas={cuentas}
         cuentaDestinoId={ingreso.cuenta_destino_id}
+        fechaEsperada={ingreso.fecha_esperada}
       />
     </>
   )
