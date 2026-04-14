@@ -1,7 +1,28 @@
 export type ISODateString = `${number}-${number}-${number}`
 
+export const APP_TIME_ZONE = 'America/Merida'
+
 function pad(value: number): string {
   return String(value).padStart(2, '0')
+}
+
+function getDatePartsInTimeZone(date: Date, timeZone = APP_TIME_ZONE) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+  }
 }
 
 export function parseISODateLocal(value: string): Date {
@@ -10,7 +31,8 @@ export function parseISODateLocal(value: string): Date {
 }
 
 export function formatISODateLocal(date: Date): ISODateString {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as ISODateString
+  const { year, month, day } = getDatePartsInTimeZone(date)
+  return `${year}-${pad(month)}-${pad(day)}` as ISODateString
 }
 
 export function getTodayLocalISO(now = new Date()): ISODateString {
@@ -57,7 +79,8 @@ export function diffCalendarDays(
 }
 
 export function getCurrentMonthKey(now = new Date()): `${number}-${number}` {
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}` as `${number}-${number}`
+  const { year, month } = getDatePartsInTimeZone(now)
+  return `${year}-${pad(month)}` as `${number}-${number}`
 }
 
 export function sortByISODateDesc(a: string, b: string): number {
@@ -65,10 +88,12 @@ export function sortByISODateDesc(a: string, b: string): number {
 }
 
 export function getStartOfMonthISO(now = new Date()): ISODateString {
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01` as ISODateString
+  const { year, month } = getDatePartsInTimeZone(now)
+  return `${year}-${pad(month)}-01` as ISODateString
 }
 
 export function getEndOfMonthISO(now = new Date()): ISODateString {
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const { year, month } = getDatePartsInTimeZone(now)
+  const lastDay = new Date(year, month, 0, 12, 0, 0, 0)
   return formatISODateLocal(lastDay)
 }

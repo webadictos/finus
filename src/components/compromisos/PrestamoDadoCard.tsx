@@ -195,12 +195,14 @@ export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
       </div>
 
       {/* Modal de abono */}
-      <PrestamoDadoForm
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        cuentas={cuentas}
-        prestamo={prestamo}
-      />
+      {editOpen && (
+        <PrestamoDadoForm
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          cuentas={cuentas}
+          prestamo={prestamo}
+        />
+      )}
 
       <Dialog.Root open={abonoOpen} onOpenChange={(v) => { if (!isPending) { setAbonoOpen(v); if (!v) { setMontoAbono(''); setCuentaId(''); setAbonoError(null) } } }}>
         <Dialog.Portal>

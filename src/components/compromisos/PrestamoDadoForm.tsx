@@ -23,31 +23,37 @@ interface Props {
   prestamo?: PrestamoDado | null
 }
 
+function getInitialValues(prestamo?: PrestamoDado | null) {
+  return {
+    deudor: prestamo?.deudor ?? '',
+    montoPrestado: prestamo?.monto_prestado != null ? String(Number(prestamo.monto_prestado)) : '',
+    montoARecuperar: prestamo?.monto_a_recuperar != null ? String(Number(prestamo.monto_a_recuperar)) : '',
+    fechaDevolucion: prestamo?.fecha_devolucion ?? '',
+    cuentaOrigenId: prestamo?.cuenta_origen_id ?? '',
+    notas: prestamo?.notas ?? '',
+  }
+}
+
 export default function PrestamoDadoForm({
   open,
   onOpenChange,
   cuentas,
   prestamo,
 }: Props) {
-  const [deudor, setDeudor] = useState('')
-  const [montoPrestado, setMontoPrestado] = useState('')
-  const [montoARecuperar, setMontoARecuperar] = useState('')
-  const [fechaDevolucion, setFechaDevolucion] = useState('')
-  const [cuentaOrigenId, setCuentaOrigenId] = useState('')
-  const [notas, setNotas] = useState('')
+  const initialValues = getInitialValues(prestamo)
+  const [deudor, setDeudor] = useState(initialValues.deudor)
+  const [montoPrestado, setMontoPrestado] = useState(initialValues.montoPrestado)
+  const [montoARecuperar, setMontoARecuperar] = useState(initialValues.montoARecuperar)
+  const [fechaDevolucion, setFechaDevolucion] = useState(initialValues.fechaDevolucion)
+  const [cuentaOrigenId, setCuentaOrigenId] = useState(initialValues.cuentaOrigenId)
+  const [notas, setNotas] = useState(initialValues.notas)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const isEditing = !!prestamo
 
   const handleOpenChange = (next: boolean) => {
-    if (next) {
-      setDeudor(prestamo?.deudor ?? '')
-      setMontoPrestado(prestamo?.monto_prestado != null ? String(Number(prestamo.monto_prestado)) : '')
-      setMontoARecuperar(prestamo?.monto_a_recuperar != null ? String(Number(prestamo.monto_a_recuperar)) : '')
-      setFechaDevolucion(prestamo?.fecha_devolucion ?? '')
-      setCuentaOrigenId(prestamo?.cuenta_origen_id ?? '')
-      setNotas(prestamo?.notas ?? '')
+    if (!next) {
       setError(null)
     }
     onOpenChange(next)

@@ -58,7 +58,9 @@ export default function PrestamoDadosSection({ prestamos, cuentas }: Props) {
         )}
       </div>
 
-      <PrestamoDadoForm open={formOpen} onOpenChange={setFormOpen} cuentas={cuentas} />
+      {formOpen && (
+        <PrestamoDadoForm open={formOpen} onOpenChange={setFormOpen} cuentas={cuentas} />
+      )}
     </>
   )
 }

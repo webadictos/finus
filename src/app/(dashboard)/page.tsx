@@ -119,6 +119,7 @@ async function DashboardData({ period }: { period: ReturnType<typeof normalizeDa
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CompromisosVencidos
           compromisos={compromisos}
+          lineas={lineas}
           cuentas={cuentas}
           saldoDisponible={saldoDisponible}
           reservaOperativa={reservaOperativa}

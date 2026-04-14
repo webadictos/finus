@@ -1,3 +1,9 @@
+import {
+  formatISODateLocal,
+  getTodayLocalISO,
+  parseISODateLocal,
+} from '@/lib/local-date'
+
 export type DashboardPeriodKey = 'next7' | 'next15' | 'month' | 'next30'
 
 type DashboardPeriodMeta = {
@@ -24,16 +30,11 @@ export const DASHBOARD_PERIOD_OPTIONS: Array<{
 ]
 
 function normalizeDate(date: Date): Date {
-  const next = new Date(date)
-  next.setHours(0, 0, 0, 0)
-  return next
+  return parseISODateLocal(getTodayLocalISO(date))
 }
 
 function toDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatISODateLocal(date)
 }
 
 function addDays(date: Date, days: number): Date {

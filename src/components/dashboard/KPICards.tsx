@@ -2,6 +2,7 @@
 
 import { formatMXN } from '@/lib/format'
 import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
+import { getTodayLocalISO } from '@/lib/local-date'
 import type { Database } from '@/types/database'
 import { ArrowDown, ArrowUp, Calendar, CreditCard } from 'lucide-react'
 
@@ -88,8 +89,7 @@ export default function KPICards({
   period,
 }: Props) {
   const periodMeta = getDashboardPeriodMeta(period)
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
+  const hoy = getTodayLocalISO()
 
   // Disponible ahora (para proyección)
   const ingresosSinCuenta = ingresos
@@ -114,10 +114,13 @@ export default function KPICards({
   const porPagarVencidos = compromisos
     .filter((c) => {
       if (!c.activo || !c.fecha_proximo_pago) return false
-      const fecha = new Date(`${c.fecha_proximo_pago}T00:00:00`)
-      return fecha < hoy
+      return c.fecha_proximo_pago < hoy
     })
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
+
+  const porPagarLineasVencidas = lineas
+    .filter((l) => l.activa && l.fecha_proximo_pago && l.fecha_proximo_pago < hoy)
+    .reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
 
   const porPagarCompromisos = compromisos
     .filter((c) => c.activo && isDateWithinDashboardPeriod(c.fecha_proximo_pago, period))
@@ -127,7 +130,8 @@ export default function KPICards({
     return isDateWithinDashboardPeriod(l.fecha_proximo_pago, period)
   })
   const porPagarLineas = lineasProx30.reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
-  const porPagar = porPagarVencidos + porPagarCompromisos + porPagarLineas
+  const porPagarVencidoTotal = porPagarVencidos + porPagarLineasVencidas
+  const porPagar = porPagarVencidoTotal + porPagarCompromisos + porPagarLineas
 
   // 3. Líneas de crédito — totales de pago sin intereses
   const totalPSI = lineasProx30.reduce((sum, l) => sum + Number(l.pago_sin_intereses ?? 0), 0)
@@ -171,8 +175,8 @@ export default function KPICards({
         label="Por pagar"
         value={formatMXN(porPagar)}
         sublabel={
-          porPagarVencidos > 0
-            ? `Incluye ${formatMXN(porPagarVencidos)} vencidos + ${periodMeta.sublabel.toLowerCase()}`
+          porPagarVencidoTotal > 0
+            ? `Incluye ${formatMXN(porPagarVencidoTotal)} vencidos + ${periodMeta.sublabel.toLowerCase()}`
             : periodMeta.sublabel
         }
         icon={<ArrowUp className="size-4 text-destructive" />}
