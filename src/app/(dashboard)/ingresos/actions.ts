@@ -27,7 +27,7 @@ function getRecurringIngresoPayload(formData: FormData) {
     esRecurrente && frecuencia === 'mensual'
       ? resolveIngresoDiaDelMes(fechaEsperada)
       : null
-  const montoFijo = esRecurrente ? montoEsperado : null
+  const montoFijo = montoEsperado != null
 
   return {
     esRecurrente,
@@ -263,7 +263,7 @@ export async function confirmarIngreso(
           frecuencia: ingreso.frecuencia,
           dia_del_mes: resolveIngresoDiaDelMes(ingreso.fecha_esperada, ingreso.dia_del_mes),
           monto_fijo: ingreso.monto_fijo,
-          monto_esperado: ingreso.monto_fijo ?? ingreso.monto_esperado,
+          monto_esperado: ingreso.monto_esperado,
           fecha_esperada: nextFecha,
           estado: 'esperado' as const,
           probabilidad: ingreso.probabilidad ?? 'alta',
@@ -387,7 +387,7 @@ export async function confirmarIngresoPhantom(
         frecuencia: original.frecuencia,
         dia_del_mes: original.dia_del_mes,
         monto_fijo: original.monto_fijo,
-        monto_esperado: original.monto_fijo ?? original.monto_esperado,
+        monto_esperado: original.monto_esperado,
         fecha_esperada: fechaEsperada,
         estado: 'esperado' as const,
         probabilidad: original.probabilidad ?? 'alta',

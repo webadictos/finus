@@ -170,7 +170,7 @@ export interface Database {
           fecha_inicio: string | null
           fecha_fin: string | null
           indefinido: boolean
-          monto_fijo: number | null
+          monto_fijo: boolean | null
           monto_esperado: number | null
           monto_minimo: number | null
           monto_maximo: number | null
@@ -197,7 +197,7 @@ export interface Database {
           fecha_inicio?: string | null
           fecha_fin?: string | null
           indefinido?: boolean
-          monto_fijo?: number | null
+          monto_fijo?: boolean | null
           monto_esperado?: number | null
           monto_minimo?: number | null
           monto_maximo?: number | null
@@ -224,7 +224,7 @@ export interface Database {
           fecha_inicio?: string | null
           fecha_fin?: string | null
           indefinido?: boolean
-          monto_fijo?: number | null
+          monto_fijo?: boolean | null
           monto_esperado?: number | null
           monto_minimo?: number | null
           monto_maximo?: number | null

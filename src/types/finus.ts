@@ -71,7 +71,7 @@ export interface Ingreso {
   es_recurrente: boolean
   frecuencia: 'mensual' | 'quincenal' | 'semanal' | 'anual' | null
   dia_del_mes: number | null
-  monto_fijo: number | null
+  monto_fijo: boolean | null
   monto_esperado: number | null
   fecha_esperada: string | null
   fecha_real: string | null
