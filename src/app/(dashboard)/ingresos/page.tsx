@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { formatMXN } from '@/lib/format'
 import { TrendingUp } from 'lucide-react'
+import ObtenerLiquidezButton from '@/components/dashboard/ObtenerLiquidezButton'
 import IngresoCard from '@/components/ingresos/IngresoCard'
 import IngresosPeriodFilter from '@/components/ingresos/IngresosPeriodFilter'
 import NuevoIngresoButton from '@/components/ingresos/NuevoIngresoButton'
@@ -46,6 +47,15 @@ export default async function IngresosPage({ searchParams }: Props) {
 
   const ingresos: Ingreso[] = data ?? []
   const cuentas = cuentasRes.data ?? []
+  const cuentasLiquidas = cuentas.filter((c) => c.tipo !== 'inversion')
+
+  const { data: lineasData } = await supabase
+    .from('lineas_credito')
+    .select('*')
+    .eq('activa', true)
+    .order('nombre', { ascending: true })
+
+  const lineas = lineasData ?? []
   const ingresosConRecurrentes = [
     ...ingresos,
     ...getProjectedRecurringIngresos(ingresos, periodMeta.projectionHorizonDays),
@@ -78,7 +88,12 @@ export default async function IngresosPage({ searchParams }: Props) {
             Flujo de entradas esperadas y confirmadas
           </p>
         </div>
-        <NuevoIngresoButton cuentas={cuentas} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {cuentasLiquidas.length > 0 && lineas.length > 0 && (
+            <ObtenerLiquidezButton lineas={lineas} cuentas={cuentasLiquidas} />
+          )}
+          <NuevoIngresoButton cuentas={cuentas} />
+        </div>
       </div>
 
       <IngresosPeriodFilter period={currentPeriod} />

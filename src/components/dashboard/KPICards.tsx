@@ -1,6 +1,7 @@
 'use client'
 
 import { formatMXN } from '@/lib/format'
+import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
 import type { Database } from '@/types/database'
 import { ArrowDown, ArrowUp, Calendar, CreditCard } from 'lucide-react'
 
@@ -15,6 +16,7 @@ interface Props {
   compromisos: Compromiso[]
   lineas: LineaCredito[]
   reservaOperativa: number
+  period: DashboardPeriodKey
 }
 
 function calcularPagoMinimo(c: Compromiso): number {
@@ -77,12 +79,17 @@ function KPICard({ label, value, sublabel, icon, colorClass = 'text-foreground',
   )
 }
 
-export default function KPICards({ cuentas, ingresos, compromisos, lineas, reservaOperativa }: Props) {
+export default function KPICards({
+  cuentas,
+  ingresos,
+  compromisos,
+  lineas,
+  reservaOperativa,
+  period,
+}: Props) {
+  const periodMeta = getDashboardPeriodMeta(period)
   const hoy = new Date()
-  const en15dias = new Date(hoy)
-  en15dias.setDate(en15dias.getDate() + 15)
-  const en30dias = new Date(hoy)
-  en30dias.setDate(en30dias.getDate() + 30)
+  hoy.setHours(0, 0, 0, 0)
 
   // Disponible ahora (para proyección)
   const ingresosSinCuenta = ingresos
@@ -98,57 +105,54 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas, reser
   const porRecibir = ingresos
     .filter((i) => {
       if (i.estado === 'confirmado') return false
-      if (!i.fecha_esperada) return i.tipo === 'fijo_recurrente'
-      const fecha = new Date(i.fecha_esperada)
-      return fecha >= hoy && fecha <= en30dias
+      if (!i.fecha_esperada) return false
+      return isDateWithinDashboardPeriod(i.fecha_esperada, period)
     })
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
   // 2. Por pagar — compromisos fijos + líneas de crédito con vencimiento próximo
+  const porPagarVencidos = compromisos
+    .filter((c) => {
+      if (!c.activo || !c.fecha_proximo_pago) return false
+      const fecha = new Date(`${c.fecha_proximo_pago}T00:00:00`)
+      return fecha < hoy
+    })
+    .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
+
   const porPagarCompromisos = compromisos
-    .filter((c) => c.activo)
+    .filter((c) => c.activo && isDateWithinDashboardPeriod(c.fecha_proximo_pago, period))
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
 
   const lineasProx30 = lineas.filter((l) => {
-    if (!l.fecha_proximo_pago) return true
-    const fecha = new Date(l.fecha_proximo_pago)
-    return fecha >= hoy && fecha <= en30dias
+    return isDateWithinDashboardPeriod(l.fecha_proximo_pago, period)
   })
   const porPagarLineas = lineasProx30.reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
-  const porPagar = porPagarCompromisos + porPagarLineas
+  const porPagar = porPagarVencidos + porPagarCompromisos + porPagarLineas
 
   // 3. Líneas de crédito — totales de pago sin intereses
-  const totalPSI = lineas.reduce((sum, l) => sum + Number(l.pago_sin_intereses ?? 0), 0)
+  const totalPSI = lineasProx30.reduce((sum, l) => sum + Number(l.pago_sin_intereses ?? 0), 0)
 
-  // 4. Proyección 15 días
-  const ingresosProx15 = ingresos
+  // 4. Proyección del periodo activo
+  const ingresosPeriodo = ingresos
     .filter((i) => {
       if (i.estado === 'en_riesgo') return false
       if (!i.fecha_esperada) return false
-      const fecha = new Date(i.fecha_esperada)
-      return fecha >= hoy && fecha <= en15dias
+      return isDateWithinDashboardPeriod(i.fecha_esperada, period)
     })
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0) * probFactor(i.probabilidad), 0)
 
-  const compromisosProx15 = compromisos
+  const compromisosPeriodo = compromisos
     .filter((c) => {
       if (!c.activo) return false
-      if (!c.fecha_proximo_pago) return false
-      const fecha = new Date(c.fecha_proximo_pago)
-      return fecha >= hoy && fecha <= en15dias
+      return isDateWithinDashboardPeriod(c.fecha_proximo_pago, period)
     })
     .reduce((sum, c) => sum + calcularPagoMinimo(c), 0)
 
-  const lineasProx15 = lineas
-    .filter((l) => {
-      if (!l.fecha_proximo_pago) return false
-      const fecha = new Date(l.fecha_proximo_pago)
-      return fecha >= hoy && fecha <= en15dias
-    })
+  const lineasPeriodo = lineas
+    .filter((l) => isDateWithinDashboardPeriod(l.fecha_proximo_pago, period))
     .reduce((sum, l) => sum + Number(l.pago_minimo ?? 0), 0)
 
-  const proyeccion15 =
-    disponible + ingresosProx15 - compromisosProx15 - lineasProx15 - reservaOperativa
+  const proyeccion = disponible + ingresosPeriodo - compromisosPeriodo - lineasPeriodo - reservaOperativa
 
   const scrollAProximosIngresos = () => {
     document.getElementById('proximos-ingresos')?.scrollIntoView({ behavior: 'smooth' })
@@ -159,37 +163,41 @@ export default function KPICards({ cuentas, ingresos, compromisos, lineas, reser
       <KPICard
         label="Por recibir"
         value={formatMXN(porRecibir)}
-        sublabel="Próximos 30 días"
+        sublabel={periodMeta.sublabel}
         icon={<ArrowDown className="size-4 text-emerald-500" />}
         onClick={scrollAProximosIngresos}
       />
       <KPICard
         label="Por pagar"
         value={formatMXN(porPagar)}
-        sublabel={`Compromisos + ${lineas.length} línea${lineas.length !== 1 ? 's' : ''}`}
+        sublabel={
+          porPagarVencidos > 0
+            ? `Incluye ${formatMXN(porPagarVencidos)} vencidos + ${periodMeta.sublabel.toLowerCase()}`
+            : periodMeta.sublabel
+        }
         icon={<ArrowUp className="size-4 text-destructive" />}
         colorClass="text-destructive"
       />
       <KPICard
         label="Líneas — sin intereses"
         value={formatMXN(totalPSI)}
-        sublabel={`Mínimos: ${formatMXN(porPagarLineas)}`}
+        sublabel={period === 'month' ? 'Vence en el mes actual' : periodMeta.sublabel}
         icon={<CreditCard className="size-4 text-orange-500" />}
         colorClass="text-orange-500"
       />
       <KPICard
-        label="Reserva operativa"
+        label="Reserva operativa (7 días)"
         value={formatMXN(reservaOperativa)}
-        sublabel="Próximos 7 días"
+        sublabel="Cobertura de 7 días"
         icon={<Calendar className="size-4 text-sky-600" />}
         colorClass="text-sky-600"
       />
       <KPICard
-        label="Proyección 15 días"
-        value={formatMXN(proyeccion15)}
+        label={periodMeta.projectionLabel}
+        value={formatMXN(proyeccion)}
         sublabel="Ingresos prob. − pagos − reserva"
         icon={<Calendar className="size-4" />}
-        colorClass={proyeccion15 >= 0 ? 'text-emerald-500' : 'text-destructive'}
+        colorClass={proyeccion >= 0 ? 'text-emerald-500' : 'text-destructive'}
       />
     </div>
   )

@@ -50,7 +50,7 @@ export default function CompromisosVencidos({
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle className="size-4 text-destructive" />
         <h2 className="text-sm font-semibold text-destructive">
-          Compromisos vencidos{' '}
+          Compromisos vencidos a hoy{' '}
           <span className="ml-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-xs font-medium text-destructive">
             {vencidos.length}
           </span>

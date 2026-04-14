@@ -22,6 +22,11 @@ type Horizonte = (typeof HORIZONTES)[number]
 
 const PROB_FACTOR: Record<string, number> = { alta: 0.9, media: 0.5, baja: 0.2 }
 const CERTEZA_FACTOR: Record<string, number> = { alta: 1.0, media: 0.7, baja: 0.4 }
+const PROB_PERCENT_LABEL: Record<string, string> = {
+  alta: '90%',
+  media: '50%',
+  baja: '20%',
+}
 
 const TIPO_INGRESO_LABEL: Record<string, string> = {
   fijo_recurrente: 'Fijo',
@@ -226,9 +231,14 @@ export default function ProyeccionClient({
                         {formatMXN(monto * factor)}
                       </span>
                       {factor < 1 && (
-                        <span className="text-[10px] text-muted-foreground line-through tabular-nums">
-                          {formatMXN(monto)}
-                        </span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[10px] font-medium text-emerald-600/80">
+                            Ajustado por probabilidad ({PROB_PERCENT_LABEL[i.probabilidad] ?? `${Math.round(factor * 100)}%`})
+                          </span>
+                          <span className="text-[10px] text-muted-foreground line-through tabular-nums">
+                            Nominal: {formatMXN(monto)}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

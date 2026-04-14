@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
+import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
 import { getRecomendacion, getRecomendacionLinea } from '@/lib/recommendations'
 import RecomendacionBadge from '@/components/compromisos/RecomendacionBadge'
 import PagarModal from '@/components/compromisos/PagarModal'
@@ -23,6 +24,7 @@ interface Props {
   cuentas: Cuenta[]
   saldoDisponible: number
   reservaOperativa?: number
+  period: DashboardPeriodKey
 }
 
 type ItemVencimiento =
@@ -36,28 +38,23 @@ export default function AlertasVencimiento({
   cuentas,
   saldoDisponible,
   reservaOperativa = 0,
+  period,
 }: Props) {
+  const periodMeta = getDashboardPeriodMeta(period)
   const [pagarCompromisoId, setPagarCompromisoId] = useState<string | null>(null)
   const [pagarLineaId, setPagarLineaId] = useState<string | null>(null)
-
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const en7dias = new Date(hoy)
-  en7dias.setDate(en7dias.getDate() + 7)
 
   const proximosCompromisos: ItemVencimiento[] = compromisos
     .filter((c) => {
       if (!c.activo || !c.fecha_proximo_pago) return false
-      const fecha = new Date(c.fecha_proximo_pago + 'T00:00:00')
-      return fecha >= hoy && fecha <= en7dias
+      return isDateWithinDashboardPeriod(c.fecha_proximo_pago, period)
     })
     .map((c) => ({ kind: 'compromiso' as const, data: c, dias: diasHastaFecha(c.fecha_proximo_pago!) }))
 
   const proximasLineas: ItemVencimiento[] = lineas
     .filter((l) => {
       if (!l.activa || !l.fecha_proximo_pago) return false
-      const fecha = new Date(l.fecha_proximo_pago + 'T00:00:00')
-      return fecha >= hoy && fecha <= en7dias
+      return isDateWithinDashboardPeriod(l.fecha_proximo_pago, period)
     })
     .map((l) => ({ kind: 'linea' as const, data: l, dias: diasHastaFecha(l.fecha_proximo_pago!) }))
 
@@ -74,7 +71,9 @@ export default function AlertasVencimiento({
           <AlertCircle className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Próximos vencimientos</h2>
         </div>
-        <p className="text-sm text-muted-foreground">Sin vencimientos en los próximos 7 días.</p>
+        <p className="text-sm text-muted-foreground">
+          Sin vencimientos en {periodMeta.emptyLabel}.
+        </p>
       </div>
     )
   }
@@ -89,6 +88,9 @@ export default function AlertasVencimiento({
             {proximos.length}
           </span>
         </h2>
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {periodMeta.sublabel}
+        </span>
       </div>
 
       <div className="flex flex-col gap-3 mb-3">

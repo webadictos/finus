@@ -1,26 +1,24 @@
 import { CalendarClock } from 'lucide-react'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
+import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
 import type { Database } from '@/types/database'
 
 type GastoPrevisto = Database['public']['Tables']['gastos_previstos']['Row']
 
 interface Props {
   gastos: GastoPrevisto[]
+  period: DashboardPeriodKey
 }
 
-export default function ProximosGastosPrevistos({ gastos }: Props) {
+export default function ProximosGastosPrevistos({ gastos, period }: Props) {
+  const periodMeta = getDashboardPeriodMeta(period)
   const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const en7dias = new Date(hoy)
-  en7dias.setDate(en7dias.getDate() + 7)
-  const mesActual = hoy.toISOString().slice(0, 7) // YYYY-MM
+  const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
 
   const proximos = gastos
     .filter((g) => {
       const fechaRef = g.fecha_confirmada ?? g.fecha_sugerida
-      if (!fechaRef) return false
-      const d = new Date(fechaRef + 'T00:00:00')
-      return d <= en7dias
+      return isDateWithinDashboardPeriod(fechaRef, period)
     })
     .sort((a, b) => {
       const fa = a.fecha_confirmada ?? a.fecha_sugerida ?? ''
@@ -30,6 +28,7 @@ export default function ProximosGastosPrevistos({ gastos }: Props) {
 
   const sinFechaMes = gastos.filter(
     (g) =>
+      period === 'month' &&
       g.tipo_programacion === 'previsto_sin_fecha' &&
       g.mes === mesActual &&
       !g.realizado &&
@@ -43,7 +42,9 @@ export default function ProximosGastosPrevistos({ gastos }: Props) {
           <CalendarClock className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Gastos previstos</h2>
         </div>
-        <p className="text-sm text-muted-foreground">Sin gastos previstos en los próximos 7 días.</p>
+        <p className="text-sm text-muted-foreground">
+          Sin gastos previstos en {periodMeta.emptyLabel}.
+        </p>
       </div>
     )
   }
@@ -58,6 +59,9 @@ export default function ProximosGastosPrevistos({ gastos }: Props) {
             {proximos.length + sinFechaMes.length}
           </span>
         </h2>
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {periodMeta.sublabel}
+        </span>
       </div>
 
       {proximos.length > 0 && (

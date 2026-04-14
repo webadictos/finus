@@ -1,4 +1,5 @@
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
+import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
 import { ConfirmarIngresoButton } from './ConfirmarIngresoButton'
 import type { Database } from '@/types/database'
 import { TrendingUp } from 'lucide-react'
@@ -28,12 +29,15 @@ const ESTADO_LABEL: Record<string, { label: string; className: string }> = {
 interface Props {
   ingresos: Ingreso[]
   cuentas: Cuenta[]
+  period: DashboardPeriodKey
 }
 
-export default function ProximosIngresos({ ingresos, cuentas }: Props) {
+export default function ProximosIngresos({ ingresos, cuentas, period }: Props) {
+  const periodMeta = getDashboardPeriodMeta(period)
+
   // Solo ingresos no confirmados con fecha próxima, o fijos recurrentes sin fecha
   const proximos = ingresos
-    .filter((i) => i.estado !== 'confirmado')
+    .filter((i) => i.estado !== 'confirmado' && isDateWithinDashboardPeriod(i.fecha_esperada, period))
     .sort((a, b) => {
       if (!a.fecha_esperada && !b.fecha_esperada) return 0
       if (!a.fecha_esperada) return 1
@@ -49,7 +53,9 @@ export default function ProximosIngresos({ ingresos, cuentas }: Props) {
           <TrendingUp className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Próximos ingresos</h2>
         </div>
-        <p className="text-sm text-muted-foreground">No hay ingresos pendientes registrados.</p>
+        <p className="text-sm text-muted-foreground">
+          No hay ingresos pendientes en {periodMeta.emptyLabel}.
+        </p>
       </div>
     )
   }
@@ -59,6 +65,9 @@ export default function ProximosIngresos({ ingresos, cuentas }: Props) {
       <div className="flex items-center gap-2 mb-3">
         <TrendingUp className="size-4 text-emerald-500" />
         <h2 className="text-sm font-semibold">Próximos ingresos</h2>
+        <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600">
+          {periodMeta.sublabel}
+        </span>
       </div>
 
       <div className="flex flex-col divide-y">
