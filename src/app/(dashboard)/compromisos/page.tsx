@@ -53,7 +53,7 @@ export default async function CompromisosPage({
       .from('compromisos')
       .select('*')
       .eq('activo', true)
-      .in('tipo_pago', ['fijo', 'prestamo'])
+      .in('tipo_pago', ['fijo', 'prestamo', 'suscripcion'])
       .order('fecha_proximo_pago', { ascending: true, nullsFirst: false }),
     supabase
       .from('transacciones')
@@ -169,7 +169,7 @@ export default async function CompromisosPage({
               <CreditCard className="size-8 text-muted-foreground" />
               <p className="text-sm font-medium">Sin pagos fijos registrados</p>
               <p className="text-xs text-muted-foreground">
-                Agrega préstamos y servicios de cuota fija
+                Agrega préstamos, servicios fijos y suscripciones
               </p>
               <NuevoCompromisoButton tarjetas={[]} label="Nuevo pago fijo" />
             </div>
