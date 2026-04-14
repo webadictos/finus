@@ -269,7 +269,7 @@ export default function GastosClient({
                 onClick={() => navigate({ payment: option.key })}
                 className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   payment === option.key
-                    ? 'bg-destructive text-destructive-foreground'
+                    ? 'bg-foreground text-background shadow-sm'
                     : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
                 }`}
               >
