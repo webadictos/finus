@@ -630,6 +630,14 @@ export async function registrarPagoLinea(
   if (!user) return { error: 'No autenticado' }
 
   const hoy = getTodayLocalISO()
+  const { data: linea, error: lineaError } = await supabase
+    .from('lineas_credito')
+    .select('nombre, fecha_proximo_pago')
+    .eq('id', lineaId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (lineaError || !linea) return { error: 'Línea de crédito no encontrada' }
 
   // 1. Insertar en pagos_linea
   const { error: insertError } = await supabase.from('pagos_linea').insert({
@@ -649,12 +657,40 @@ export async function registrarPagoLinea(
   })
   if (rpcError) return { error: rpcError.message }
 
-  // 3. Descontar del saldo de la cuenta si se especificó
+  // 3. Registrar transacción para trazabilidad si el pago salió de una cuenta
   if (cuentaOrigenId) {
-    await supabase.rpc('decrementar_saldo', {
+    const formaPago = await getCuentaFormaPago(supabase, user.id, cuentaOrigenId)
+    const { error: txError } = await supabase.from('transacciones').insert({
+      usuario_id: user.id,
+      monto: montoPagado,
+      tipo: 'gasto' as const,
+      descripcion: `Pago línea de crédito: ${linea.nombre}`,
+      fecha: hoy,
+      cuenta_id: cuentaOrigenId,
+      forma_pago: formaPago,
+    })
+    if (txError) return { error: txError.message }
+  }
+
+  // 4. Avanzar fecha_proximo_pago para reflejar el pago del periodo actual
+  if (linea.fecha_proximo_pago) {
+    const siguienteFecha = addMonthsToISODate(linea.fecha_proximo_pago, 1)
+    const { error: updateError } = await supabase
+      .from('lineas_credito')
+      .update({ fecha_proximo_pago: siguienteFecha })
+      .eq('id', lineaId)
+      .eq('usuario_id', user.id)
+
+    if (updateError) return { error: updateError.message }
+  }
+
+  // 5. Descontar del saldo de la cuenta si se especificó
+  if (cuentaOrigenId) {
+    const { error: cuentaError } = await supabase.rpc('decrementar_saldo', {
       p_cuenta_id: cuentaOrigenId,
       p_monto: montoPagado,
     })
+    if (cuentaError) return { error: cuentaError.message }
   }
 
   revalidatePath('/compromisos')
@@ -757,6 +793,14 @@ export async function pagarLineaDesdePrestamo(
   if (!user) return { error: 'No autenticado' }
 
   const hoy = getTodayLocalISO()
+  const { data: linea, error: lineaError } = await supabase
+    .from('lineas_credito')
+    .select('nombre, fecha_proximo_pago')
+    .eq('id', lineaId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (lineaError || !linea) return { error: 'Línea de crédito no encontrada' }
 
   // 1. Insertar en pagos_linea
   const { error: insertError } = await supabase.from('pagos_linea').insert({
@@ -776,15 +820,30 @@ export async function pagarLineaDesdePrestamo(
   })
   if (rpcError) return { error: rpcError.message }
 
-  // 3. Obtener nombre de la línea para la descripción
-  const { data: linea } = await supabase
-    .from('lineas_credito')
-    .select('nombre')
-    .eq('id', lineaId)
-    .eq('usuario_id', user.id)
-    .single()
+  // 3. Registrar transacción de gasto pagado con préstamo
+  const { error: txError } = await supabase.from('transacciones').insert({
+    usuario_id: user.id,
+    monto: montoLinea,
+    tipo: 'gasto' as const,
+    descripcion: `Pago línea de crédito (préstamo de ${prestamista}): ${linea.nombre}`,
+    fecha: hoy,
+    forma_pago: 'prestamo',
+  })
+  if (txError) return { error: txError.message }
 
-  // 4. Crear compromiso de devolución
+  // 4. Avanzar fecha_proximo_pago para reflejar el pago del periodo actual
+  if (linea.fecha_proximo_pago) {
+    const siguienteFecha = addMonthsToISODate(linea.fecha_proximo_pago, 1)
+    const { error: updateError } = await supabase
+      .from('lineas_credito')
+      .update({ fecha_proximo_pago: siguienteFecha })
+      .eq('id', lineaId)
+      .eq('usuario_id', user.id)
+
+    if (updateError) return { error: updateError.message }
+  }
+
+  // 5. Crear compromiso de devolución
   const { error: devoError } = await supabase.from('compromisos').insert({
     usuario_id: user.id,
     nombre: `Devolución a ${prestamista}`,
