@@ -66,7 +66,7 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
     <div className={cn('relative', className)}>
       {/* Área de pills + input */}
       <div
-        className="min-h-9 w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm flex flex-wrap gap-1.5 cursor-text focus-within:ring-1 focus-within:ring-ring"
+        className="min-h-9 w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-base md:text-sm flex flex-wrap gap-1.5 cursor-text focus-within:ring-1 focus-within:ring-ring"
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((tag) => (
@@ -95,7 +95,7 @@ export default function TagInput({ value, onChange, sugerencias = [], placeholde
           onFocus={() => setShowSugs(true)}
           onBlur={() => setTimeout(() => setShowSugs(false), 150)}
           placeholder={value.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-24 bg-transparent outline-none placeholder:text-muted-foreground text-sm"
+          className="flex-1 min-w-24 bg-transparent outline-none placeholder:text-muted-foreground text-base md:text-sm"
         />
       </div>
 

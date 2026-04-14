@@ -81,6 +81,14 @@ function todayISO() {
   return getTodayLocalISO()
 }
 
+function blurActiveElement() {
+  if (typeof document === 'undefined') return
+  const active = document.activeElement
+  if (active instanceof HTMLElement) {
+    active.blur()
+  }
+}
+
 function initialForm(tx?: Transaccion | null): FormState {
   if (!tx) {
     return {
@@ -146,6 +154,8 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
       }
       setForm(nextForm)
       setError(null)
+    } else {
+      blurActiveElement()
     }
     onOpenChange(next)
   }
@@ -187,6 +197,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
         } else {
           setForm(initialForm(transaccion))
           setError(null)
+          blurActiveElement()
           onOpenChange(false)
         }
       } else {
@@ -196,6 +207,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
         } else {
           setForm(initialForm(null))
           setError(null)
+          blurActiveElement()
           onOpenChange(false)
           onSave?.({
             previstosCoincidentes: result.previstosCoincidentes,
@@ -255,7 +267,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
   }
 
   const selectClass =
-    'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
+    'h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base md:text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30'
 
   return (
     <Dialog.Root open={open} onOpenChange={handleOpenChange}>
