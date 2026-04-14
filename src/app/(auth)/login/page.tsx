@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import PasskeyLoginButton from '@/components/auth/PasskeyLoginButton'
 import { loginAction } from '../actions'
 
 const initialState = { error: null }
@@ -66,6 +67,7 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={pending}>
               {pending ? 'Entrando…' : 'Entrar'}
             </Button>
+            <PasskeyLoginButton />
             <p className="text-sm text-muted-foreground">
               ¿No tienes cuenta?{' '}
               <Link href="/register" className="text-foreground underline underline-offset-4 hover:text-primary">

@@ -166,7 +166,7 @@ export default function PasskeysSection() {
           </div>
 
           <div className="rounded-xl border bg-muted/40 px-3 py-3 text-sm text-muted-foreground">
-            Por ahora estas passkeys se usan para desbloqueo y reautenticación dentro de tu sesión.
+            Estas passkeys se usan para desbloqueo dentro de tu sesión y también para entrar desde la pantalla inicial.
           </div>
 
           {notice && (

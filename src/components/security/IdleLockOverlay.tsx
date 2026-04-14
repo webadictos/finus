@@ -82,9 +82,17 @@ export default function IdleLockOverlay({ email }: Props) {
       setLastActivityAt(now)
     }
 
+    const checkForLock = () => {
+      if (Date.now() - lastActivityRef.current >= IDLE_TIMEOUT_MS) {
+        setIsLocked(true)
+        setUnlockMode(credentials.length > 0 ? 'passkey' : 'password')
+        setError(null)
+      }
+    }
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        markActivity()
+        checkForLock()
       }
     }
 
@@ -92,21 +100,17 @@ export default function IdleLockOverlay({ email }: Props) {
       'pointerdown',
       'keydown',
       'touchstart',
-      'focus',
-      'mousemove',
+      'scroll',
     ]
 
     for (const eventName of events) {
       window.addEventListener(eventName, markActivity, { passive: true })
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', checkForLock)
 
     const intervalId = window.setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= IDLE_TIMEOUT_MS) {
-        setIsLocked(true)
-        setUnlockMode(credentials.length > 0 ? 'passkey' : 'password')
-        setError(null)
-      }
+      checkForLock()
     }, 15_000)
 
     return () => {
@@ -114,6 +118,7 @@ export default function IdleLockOverlay({ email }: Props) {
         window.removeEventListener(eventName, markActivity)
       }
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', checkForLock)
       window.clearInterval(intervalId)
     }
   }, [credentials.length, isLocked])

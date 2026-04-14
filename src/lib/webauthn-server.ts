@@ -13,6 +13,7 @@ import type { WebAuthnCredentialRecord } from '@/lib/webauthn'
 
 export const WEBAUTHN_REG_COOKIE = 'finus_webauthn_reg_challenge'
 export const WEBAUTHN_AUTH_COOKIE = 'finus_webauthn_auth_challenge'
+export const WEBAUTHN_LOGIN_COOKIE = 'finus_webauthn_login_challenge'
 
 function toBase64Url(input: Uint8Array | ArrayBuffer) {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input)
@@ -109,14 +110,14 @@ export async function verifyRegistration(args: {
 
 export async function buildAuthenticationOptions(args: {
   request: Request
-  credentials: WebAuthnCredentialRecord[]
+  credentials?: WebAuthnCredentialRecord[]
 }) {
   const { request, credentials } = args
 
   return generateAuthenticationOptions({
     rpID: getWebAuthnRpID(request),
     userVerification: 'required',
-    allowCredentials: credentials.map((credential) => ({
+    allowCredentials: credentials?.map((credential) => ({
       id: credential.credential_id,
       transports: (credential.transports ?? undefined) as
         | AuthenticatorTransportFuture[]
