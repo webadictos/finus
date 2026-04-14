@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getTodayLocalISO } from '@/lib/local-date'
 import { revalidatePath } from 'next/cache'
 
 export type ActionResult = { error?: string }
@@ -94,7 +95,7 @@ export async function confirmarGastoPrevisto(
 
   if (fetchErr || !previsto) return { error: 'Gasto previsto no encontrado' }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
   const monto = montoReal > 0 ? montoReal : Number(previsto.monto_estimado ?? 0)
   const cuentaEfectiva =
     formaPago && ['efectivo', 'debito'].includes(formaPago) ? cuentaId : null
@@ -152,7 +153,7 @@ export async function vincularGastoPrevisto(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   const { error } = await supabase
     .from('gastos_previstos')

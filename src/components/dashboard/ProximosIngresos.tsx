@@ -1,5 +1,6 @@
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import { getDashboardPeriodMeta, isDateWithinDashboardPeriod, type DashboardPeriodKey } from '@/lib/dashboard-period'
+import { parseISODateLocal } from '@/lib/local-date'
 import { ConfirmarIngresoButton } from './ConfirmarIngresoButton'
 import type { Database } from '@/types/database'
 import { TrendingUp } from 'lucide-react'
@@ -42,7 +43,7 @@ export default function ProximosIngresos({ ingresos, cuentas, period }: Props) {
       if (!a.fecha_esperada && !b.fecha_esperada) return 0
       if (!a.fecha_esperada) return 1
       if (!b.fecha_esperada) return -1
-      return new Date(a.fecha_esperada).getTime() - new Date(b.fecha_esperada).getTime()
+      return parseISODateLocal(a.fecha_esperada).getTime() - parseISODateLocal(b.fecha_esperada).getTime()
     })
     .slice(0, 5)
 

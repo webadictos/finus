@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { confirmarFechaGasto } from '@/app/(dashboard)/proyeccion/actions'
+import { getTodayLocalISO } from '@/lib/local-date'
 
 interface Props {
   open: boolean
@@ -26,7 +27,7 @@ export default function ConfirmarFechaModal({
   certeza,
 }: Props) {
   const [fecha, setFecha] = useState(
-    fechaSugerida ?? new Date().toISOString().split('T')[0]
+    fechaSugerida ?? getTodayLocalISO()
   )
   const [montoReal, setMontoReal] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +38,7 @@ export default function ConfirmarFechaModal({
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      setFecha(fechaSugerida ?? new Date().toISOString().split('T')[0])
+      setFecha(fechaSugerida ?? getTodayLocalISO())
       setMontoReal('')
       setError(null)
       setSuccess(false)
@@ -61,7 +62,7 @@ export default function ConfirmarFechaModal({
       } else {
         setSuccess(true)
         setTimeout(() => {
-          setFecha(fechaSugerida ?? new Date().toISOString().split('T')[0])
+          setFecha(fechaSugerida ?? getTodayLocalISO())
           setMontoReal('')
           setError(null)
           setSuccess(false)

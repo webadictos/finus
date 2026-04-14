@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { confirmarIngreso, confirmarIngresoPhantom } from '@/app/(dashboard)/ingresos/actions'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { formatMXN } from '@/lib/format'
+import { getTodayLocalISO } from '@/lib/local-date'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -50,7 +51,7 @@ export default function ConfirmarModal({
 }: Props) {
   const isPhantom = ingresoId.endsWith('_next')
   const originalId = isPhantom ? ingresoId.slice(0, -5) : ingresoId
-  const today = new Date().toISOString().split('T')[0]
+  const today: string = getTodayLocalISO()
   const [monto, setMonto] = useState(String(montoEsperado))
   const [fecha, setFecha] = useState(today)
   const [selectedCuentaId, setSelectedCuentaId] = useState('')

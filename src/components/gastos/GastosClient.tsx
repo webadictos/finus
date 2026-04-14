@@ -1,13 +1,31 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import GastoCard from '@/components/gastos/GastoCard'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import VincularPrevistoModal from '@/components/gastos/VincularPrevistoModal'
 import { formatMXN } from '@/lib/format'
+import {
+  formatMonthKeyLabel,
+  GASTO_PAYMENT_OPTIONS,
+  GASTO_PERIOD_OPTIONS,
+  getMonthRange,
+  getPaymentLabel,
+  isOtherPayment,
+  shiftMonthKey,
+  type GastoPaymentKey,
+  type GastoPeriodKey,
+} from '@/lib/gastos-filters'
+import {
+  formatISODateForLocale,
+  getCurrentMonthKey,
+  getTodayLocalISO,
+  getYesterdayLocalISO,
+  sortByISODateDesc,
+} from '@/lib/local-date'
 import type { TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
@@ -15,18 +33,6 @@ import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function isoToday(): string {
-  return new Date().toISOString().split('T')[0]
-}
-
-function isoYesterday(): string {
-  const d = new Date()
-  d.setDate(d.getDate() - 1)
-  return d.toISOString().split('T')[0]
-}
 
 function groupByDate(txs: Transaccion[]): Map<string, Transaccion[]> {
   const map = new Map<string, Transaccion[]>()
@@ -40,38 +46,15 @@ function groupByDate(txs: Transaccion[]): Map<string, Transaccion[]> {
 }
 
 function fechaLabel(fecha: string): string {
-  const hoy = isoToday()
-  const ayer = isoYesterday()
+  const hoy = getTodayLocalISO()
+  const ayer = getYesterdayLocalISO()
   if (fecha === hoy) return 'Hoy'
   if (fecha === ayer) return 'Ayer'
-  return new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', {
+  return formatISODateForLocale(fecha, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
   })
-}
-
-/** "YYYY-MM" → "Abril 2026" */
-function mesLabel(mes: string): string {
-  const [year, month] = mes.split('-').map(Number)
-  return new Date(year, month - 1, 1).toLocaleDateString('es-MX', {
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-/** "YYYY-MM" → mes anterior "YYYY-MM" */
-function mesPrevio(mes: string): string {
-  const [year, month] = mes.split('-').map(Number)
-  const d = new Date(year, month - 2, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** "YYYY-MM" → mes siguiente "YYYY-MM" */
-function mesSiguiente(mes: string): string {
-  const [year, month] = mes.split('-').map(Number)
-  const d = new Date(year, month, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 // ─── KPI helpers ─────────────────────────────────────────────────────────────
@@ -90,7 +73,11 @@ interface Props {
   transacciones: Transaccion[]
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
-  mes: string
+  period: GastoPeriodKey
+  payment: GastoPaymentKey
+  from: string
+  to: string
+  periodLabel: string
   etiquetasSugeridas?: TagItem[]
 }
 
@@ -98,10 +85,24 @@ interface Props {
 
 type Sugerencia = { previstos: PrevistoBasico[]; transaccionId: string }
 
-export default function GastosClient({ transacciones, cuentas, tarjetas, mes, etiquetasSugeridas = [] }: Props) {
+export default function GastosClient({
+  transacciones,
+  cuentas,
+  tarjetas,
+  period,
+  payment,
+  from,
+  to,
+  periodLabel,
+  etiquetasSugeridas = [],
+}: Props) {
   const [formOpen, setFormOpen] = useState(false)
   const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null)
+  const [customFrom, setCustomFrom] = useState(from)
+  const [customTo, setCustomTo] = useState(to)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   function handleSave(data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) {
     if (data.previstosCoincidentes && data.previstosCoincidentes.length > 0 && data.transaccionId) {
@@ -109,12 +110,48 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes, et
     }
   }
 
-  const now = new Date()
-  const currentMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const esMesActual = mes === currentMes
+  const currentMes = getCurrentMonthKey()
+  const currentMonthRange = getMonthRange(currentMes)
+  const selectedMonthKey = period === 'month' && from ? from.slice(0, 7) as `${number}-${number}` : currentMes
+  const esMesActual = selectedMonthKey === currentMes
 
-  function navegar(destino: string) {
-    router.push(`/gastos?mes=${destino}`)
+  function navigate(next: {
+    period?: GastoPeriodKey
+    payment?: GastoPaymentKey
+    from?: string
+    to?: string
+  }) {
+    const params = new URLSearchParams(searchParams.toString())
+    const nextPeriod = next.period ?? period
+    const nextPayment = next.payment ?? payment
+    params.set('period', nextPeriod)
+    params.set('payment', nextPayment)
+
+    if (nextPeriod === 'custom') {
+      if (next.from) params.set('from', next.from)
+      if (next.to) params.set('to', next.to)
+    } else if (nextPeriod === 'month' && next.from) {
+      const monthKey = next.from.slice(0, 7) as `${number}-${number}`
+      const monthRange = getMonthRange(monthKey)
+      params.set('from', monthRange.start)
+      params.set('to', monthRange.end)
+    } else {
+      params.delete('from')
+      params.delete('to')
+    }
+
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
+  function aplicarRangoCustom() {
+    if (!customFrom || !customTo || customFrom > customTo) return
+    navigate({ period: 'custom', from: customFrom, to: customTo })
+  }
+
+  function moverMes(delta: number) {
+    const nextMonth = shiftMonthKey(selectedMonthKey, delta)
+    const range = getMonthRange(nextMonth)
+    navigate({ period: 'month', from: range.start, to: range.end })
   }
 
   // Build tarjetas map for card display
@@ -123,37 +160,124 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes, et
   // KPIs
   const totalMes = transacciones.reduce((sum, t) => sum + Number(t.monto ?? 0), 0)
   const porFormaPago = transacciones.reduce<Record<string, number>>((acc, t) => {
-    const fp = t.forma_pago ?? 'otro'
+    const fp = isOtherPayment(t.forma_pago) ? 'otro' : (t.forma_pago as string)
     acc[fp] = (acc[fp] ?? 0) + Number(t.monto ?? 0)
     return acc
   }, {})
 
   // Group by date (already ordered DESC by fecha)
   const grupos = groupByDate(transacciones)
-  const fechas = Array.from(grupos.keys()).sort((a, b) => b.localeCompare(a))
+  const fechas = Array.from(grupos.keys()).sort(sortByISODateDesc)
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Selector de período */}
-      <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
-        <button
-          onClick={() => navegar(mesPrevio(mes))}
-          className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-          aria-label="Mes anterior"
-        >
-          <ChevronLeft className="size-4" />
-        </button>
+      <div className="rounded-xl border bg-card px-4 py-4 flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Periodo
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {GASTO_PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => {
+                  if (option.key === 'month') {
+                    navigate({
+                      period: 'month',
+                      from: currentMonthRange.start,
+                      to: currentMonthRange.end,
+                    })
+                    return
+                  }
+                  navigate({ period: option.key })
+                }}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  period === option.key
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <span className="text-sm font-semibold capitalize">{mesLabel(mes)}</span>
+        {period === 'month' && (
+          <div className="flex items-center justify-between rounded-xl border bg-background px-3 py-2">
+            <button
+              type="button"
+              onClick={() => moverMes(-1)}
+              className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+              aria-label="Mes anterior"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
 
-        <button
-          onClick={() => navegar(mesSiguiente(mes))}
-          disabled={esMesActual}
-          className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          aria-label="Mes siguiente"
-        >
-          <ChevronRight className="size-4" />
-        </button>
+            <span className="text-sm font-semibold capitalize">{formatMonthKeyLabel(selectedMonthKey)}</span>
+
+            <button
+              type="button"
+              onClick={() => moverMes(1)}
+              disabled={esMesActual}
+              className="flex items-center justify-center rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Mes siguiente"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+        )}
+
+        {period === 'custom' && (
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="gastos-from" className="text-xs text-muted-foreground">Desde</label>
+              <input
+                id="gastos-from"
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="gastos-to" className="text-xs text-muted-foreground">Hasta</label>
+              <input
+                id="gastos-to"
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <Button className="self-end" variant="outline" onClick={aplicarRangoCustom}>
+              Aplicar rango
+            </Button>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Forma de pago
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {GASTO_PAYMENT_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => navigate({ payment: option.key })}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  payment === option.key
+                    ? 'bg-destructive text-destructive-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -166,7 +290,7 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes, et
             {formatMXN(totalMes)}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {transacciones.length} {transacciones.length === 1 ? 'transacción' : 'transacciones'}
+            {transacciones.length} {transacciones.length === 1 ? 'transacción' : 'transacciones'} · {periodLabel}
           </p>
         </div>
 
@@ -179,7 +303,7 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes, et
               {Object.entries(porFormaPago).map(([fp, monto]) => (
                 <div key={fp} className="flex items-center gap-1.5">
                   <span className="text-xs text-muted-foreground">
-                    {FORMA_PAGO_LABEL[fp] ?? fp}:
+                    {FORMA_PAGO_LABEL[fp] ?? getPaymentLabel(fp as GastoPaymentKey)}:
                   </span>
                   <span className="text-sm font-semibold tabular-nums">
                     {formatMXN(monto)}
@@ -208,9 +332,9 @@ export default function GastosClient({ transacciones, cuentas, tarjetas, mes, et
           <Receipt className="size-8 text-muted-foreground/40" />
           <p className="text-sm font-medium">Sin gastos en este período</p>
           <p className="text-xs text-muted-foreground">
-            No hay gastos registrados para {mesLabel(mes)}
+            No hay gastos registrados para {periodLabel.toLowerCase()}
           </p>
-          {esMesActual && (
+          {period !== 'all' && (
             <Button size="sm" variant="outline" className="mt-2" onClick={() => setFormOpen(true)}>
               <Plus className="size-3.5" />
               Registrar primer gasto

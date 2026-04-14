@@ -7,18 +7,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatMXN } from '@/lib/format'
-import { registrarPrestamoDado } from '@/app/(dashboard)/compromisos/actions'
+import {
+  actualizarPrestamoDado,
+  registrarPrestamoDado,
+} from '@/app/(dashboard)/compromisos/actions'
 import type { Database } from '@/types/database'
 
+type PrestamoDado = Database['public']['Tables']['prestamos_dados']['Row']
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   cuentas: Cuenta[]
+  prestamo?: PrestamoDado | null
 }
 
-export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props) {
+export default function PrestamoDadoForm({
+  open,
+  onOpenChange,
+  cuentas,
+  prestamo,
+}: Props) {
   const [deudor, setDeudor] = useState('')
   const [montoPrestado, setMontoPrestado] = useState('')
   const [montoARecuperar, setMontoARecuperar] = useState('')
@@ -28,14 +38,16 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const isEditing = !!prestamo
+
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      setDeudor('')
-      setMontoPrestado('')
-      setMontoARecuperar('')
-      setFechaDevolucion('')
-      setCuentaOrigenId('')
-      setNotas('')
+      setDeudor(prestamo?.deudor ?? '')
+      setMontoPrestado(prestamo?.monto_prestado != null ? String(Number(prestamo.monto_prestado)) : '')
+      setMontoARecuperar(prestamo?.monto_a_recuperar != null ? String(Number(prestamo.monto_a_recuperar)) : '')
+      setFechaDevolucion(prestamo?.fecha_devolucion ?? '')
+      setCuentaOrigenId(prestamo?.cuenta_origen_id ?? '')
+      setNotas(prestamo?.notas ?? '')
       setError(null)
     }
     onOpenChange(next)
@@ -60,7 +72,9 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
     const fd = new FormData(e.currentTarget)
 
     startTransition(async () => {
-      const result = await registrarPrestamoDado(fd)
+      const result = prestamo
+        ? await actualizarPrestamoDado(prestamo.id, fd)
+        : await registrarPrestamoDado(fd)
       if (result.error) {
         setError(result.error)
       } else {
@@ -80,7 +94,7 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
           {/* Header */}
           <div className="flex items-start justify-between gap-2 border-b px-5 py-4">
             <Dialog.Title className="text-base font-semibold leading-tight">
-              Registrar préstamo dado
+              {isEditing ? 'Editar préstamo dado' : 'Registrar préstamo dado'}
             </Dialog.Title>
             <Dialog.Close asChild>
               <Button variant="ghost" size="icon" className="-mt-1 shrink-0">
@@ -118,7 +132,13 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
                   if (!montoARecuperar) setMontoARecuperar(e.target.value)
                 }}
                 required
+                disabled={isEditing}
               />
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  El monto prestado original no se edita desde aquí para conservar trazabilidad.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -163,6 +183,7 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
                   value={cuentaOrigenId}
                   onChange={(e) => setCuentaOrigenId(e.target.value)}
                   className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring dark:bg-input/30"
+                  disabled={isEditing}
                 >
                   <option value="">— Solo registrar, sin descontar —</option>
                   {cuentas.map((c) => (
@@ -171,6 +192,11 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
                     </option>
                   ))}
                 </select>
+                {isEditing && (
+                  <p className="text-xs text-muted-foreground">
+                    La cuenta de origen solo se define al registrar el préstamo.
+                  </p>
+                )}
               </div>
             )}
 
@@ -201,7 +227,7 @@ export default function PrestamoDadoForm({ open, onOpenChange, cuentas }: Props)
                 </Button>
               </Dialog.Close>
               <Button type="submit" className="flex-1" disabled={isPending}>
-                {isPending ? 'Guardando...' : 'Registrar'}
+                {isPending ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Registrar'}
               </Button>
             </div>
           </form>

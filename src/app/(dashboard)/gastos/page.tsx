@@ -1,11 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import GastosClient from '@/components/gastos/GastosClient'
+import {
+  getGastoPeriodMeta,
+  isOtherPayment,
+  normalizeCustomDateInput,
+  normalizeGastoPayment,
+  normalizeGastoPeriod,
+  type GastoPaymentKey,
+  type GastoPeriodKey,
+} from '@/lib/gastos-filters'
 import { parseTags, type TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
 interface Props {
-  searchParams: Promise<{ mes?: string }>
+  searchParams: Promise<{
+    period?: string
+    payment?: string
+    from?: string
+    to?: string
+  }>
 }
 
 export default async function GastosPage({ searchParams }: Props) {
@@ -15,28 +29,32 @@ export default async function GastosPage({ searchParams }: Props) {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { mes } = await searchParams
+  const rawParams = await searchParams
+  const currentPeriod = normalizeGastoPeriod(rawParams.period)
+  const currentPayment = normalizeGastoPayment(rawParams.payment)
+  const customFrom = normalizeCustomDateInput(rawParams.from)
+  const customTo = normalizeCustomDateInput(rawParams.to)
+  const periodMeta = getGastoPeriodMeta(currentPeriod, customFrom, customTo)
 
-  // Validar formato YYYY-MM o usar mes actual
-  const now = new Date()
-  const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const mesFinal = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : defaultMes
-
-  const [year, month] = mesFinal.split('-').map(Number)
-  const firstDay = `${mesFinal}-01`
-  // Último día del mes: día 0 del mes siguiente
-  const lastDayDate = new Date(year, month, 0)
-  const lastDay = `${mesFinal}-${String(lastDayDate.getDate()).padStart(2, '0')}`
-
-  const [transRes, cuentasRes, tarjetasRes, etiquetasRes] = await Promise.all([
-    supabase
+  const transaccionesQuery = supabase
       .from('transacciones')
       .select('*')
       .eq('usuario_id', user.id)
       .eq('tipo', 'gasto')
-      .gte('fecha', firstDay)
-      .lte('fecha', lastDay)
-      .order('fecha', { ascending: false }),
+      .order('fecha', { ascending: false })
+
+  if (periodMeta.start) {
+    transaccionesQuery.gte('fecha', periodMeta.start)
+  }
+  if (periodMeta.end) {
+    transaccionesQuery.lte('fecha', periodMeta.end)
+  }
+  if (currentPayment !== 'all' && currentPayment !== 'otro') {
+    transaccionesQuery.eq('forma_pago', currentPayment)
+  }
+
+  const [transRes, cuentasRes, tarjetasRes, etiquetasRes] = await Promise.all([
+    transaccionesQuery,
     supabase
       .from('cuentas')
       .select('*')
@@ -70,6 +88,13 @@ export default async function GastosPage({ searchParams }: Props) {
   const etiquetasSugeridas = Array.from(etiquetasMap.values()).sort((a, b) =>
     a.label.localeCompare(b.label, 'es-MX')
   )
+  const transacciones = (transRes.data ?? []).filter((tx) => {
+    if (currentPayment === 'all') return true
+    if (currentPayment === 'otro') {
+      return isOtherPayment(tx.forma_pago)
+    }
+    return tx.forma_pago === currentPayment
+  })
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -81,10 +106,14 @@ export default async function GastosPage({ searchParams }: Props) {
       </div>
 
       <GastosClient
-        transacciones={transRes.data ?? []}
+        transacciones={transacciones}
         cuentas={cuentasRes.data ?? []}
         tarjetas={tarjetasRes.data ?? []}
-        mes={mesFinal}
+        period={periodMeta.key as GastoPeriodKey}
+        payment={currentPayment as GastoPaymentKey}
+        from={customFrom}
+        to={customTo}
+        periodLabel={periodMeta.label}
         etiquetasSugeridas={etiquetasSugeridas}
       />
     </div>

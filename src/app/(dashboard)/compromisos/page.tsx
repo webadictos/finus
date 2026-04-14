@@ -112,9 +112,10 @@ export default async function CompromisosPage({
   const TABS = [
     { id: 'lineas', label: 'Líneas de crédito', count: lineas.length },
     { id: 'pagos', label: 'Pagos fijos', count: compromisos.length },
+    { id: 'prestamos', label: 'Dinero que te deben', count: prestamos.length },
   ] as const
 
-  const activeTab = tab === 'pagos' ? 'pagos' : 'lineas'
+  const activeTab = tab === 'pagos' || tab === 'prestamos' ? tab : 'lineas'
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl mx-auto">
@@ -157,8 +158,12 @@ export default async function CompromisosPage({
       {/* Contenido del tab activo */}
       {activeTab === 'lineas' ? (
         <LineasCreditoList lineas={lineas} cargos={cargos} cuentas={cuentas} />
-      ) : (
+      ) : activeTab === 'pagos' ? (
         <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-end">
+            <NuevoCompromisoButton tarjetas={[]} label="Nuevo pago fijo" />
+          </div>
+
           {compromisos.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-card px-6 py-12 text-center">
               <CreditCard className="size-8 text-muted-foreground" />
@@ -166,10 +171,10 @@ export default async function CompromisosPage({
               <p className="text-xs text-muted-foreground">
                 Agrega préstamos y servicios de cuota fija
               </p>
-              <NuevoCompromisoButton tarjetas={[]} />
+              <NuevoCompromisoButton tarjetas={[]} label="Nuevo pago fijo" />
             </div>
           ) : (
-            <>
+            <div className="flex flex-col gap-3">
               {compromisos.map((c) => (
                 <CompromisoCard
                   key={c.id}
@@ -181,18 +186,14 @@ export default async function CompromisosPage({
                   acuerdo={acuerdoPorCompromiso[c.id] ?? null}
                 />
               ))}
-              <div className="flex justify-end pt-1">
-                <NuevoCompromisoButton tarjetas={[]} />
-              </div>
-            </>
+            </div>
           )}
-
-          {/* Sección: dinero que te deben */}
-          <PrestamoDadosSection
-            prestamos={prestamos}
-            cuentas={cuentas}
-          />
         </div>
+      ) : (
+        <PrestamoDadosSection
+          prestamos={prestamos}
+          cuentas={cuentas}
+        />
       )}
     </div>
   )

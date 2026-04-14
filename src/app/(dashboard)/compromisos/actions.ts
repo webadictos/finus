@@ -1,5 +1,10 @@
 'use server'
 
+import {
+  addMonthsToISODate,
+  formatISODateLocal,
+  getTodayLocalISO,
+} from '@/lib/local-date'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { TipoPago } from '@/types/finus'
@@ -12,6 +17,23 @@ export type MarcarPagadoResult = {
   fechaAnterior?: string | null
   cuentaId?: string | null
   monto?: number
+}
+
+async function getCuentaFormaPago(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  cuentaId: string | null | undefined
+): Promise<'efectivo' | 'debito' | null> {
+  if (!cuentaId) return null
+
+  const { data: cuenta } = await supabase
+    .from('cuentas')
+    .select('tipo')
+    .eq('id', cuentaId)
+    .eq('usuario_id', userId)
+    .single()
+
+  return cuenta?.tipo === 'efectivo' ? 'efectivo' : 'debito'
 }
 
 export async function crearLineaCredito(
@@ -59,7 +81,7 @@ export async function crearLineaCredito(
     // Si el día límite ya pasó este mes, usar el mes siguiente
     const targetMonth = day >= dia_limite_pago ? month + 1 : month
     const target = new Date(year, targetMonth, dia_limite_pago)
-    fecha_proximo_pago = target.toISOString().split('T')[0]
+    fecha_proximo_pago = formatISODateLocal(target)
   }
 
   const { error } = await supabase.from('lineas_credito').insert({
@@ -131,7 +153,7 @@ export async function actualizarLineaCredito(
     const day = today.getDate()
     const targetMonth = day >= dia_limite_pago ? month + 1 : month
     const target = new Date(year, targetMonth, dia_limite_pago)
-    fecha_proximo_pago = target.toISOString().split('T')[0]
+    fecha_proximo_pago = formatISODateLocal(target)
   }
 
   const { error } = await supabase
@@ -387,14 +409,10 @@ export async function marcarPagado(
   const fechaAnterior = compromiso.fecha_proximo_pago
 
   // Calcular siguiente fecha de pago (+1 mes)
-  let siguienteFecha: string | null = null
-  if (fechaAnterior) {
-    const d = new Date(fechaAnterior + 'T12:00:00')
-    d.setMonth(d.getMonth() + 1)
-    siguienteFecha = d.toISOString().split('T')[0]
-  }
+  const siguienteFecha = fechaAnterior ? addMonthsToISODate(fechaAnterior, 1) : null
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
+  const formaPago = await getCuentaFormaPago(supabase, user.id, cuentaId)
 
   // Crear transacción de pago
   const { data: txData, error: txError } = await supabase
@@ -407,6 +425,7 @@ export async function marcarPagado(
       descripcion: `Pago: ${compromiso.nombre}`,
       fecha: hoy,
       cuenta_id: cuentaId ?? null,
+      forma_pago: formaPago,
     })
     .select('id')
     .single()
@@ -468,12 +487,9 @@ export async function eliminarCompromiso(
 
     if (fetchErr || !compromiso) return { error: 'Compromiso no encontrado' }
 
-    let siguienteFecha: string | null = null
-    if (compromiso.fecha_proximo_pago) {
-      const d = new Date(compromiso.fecha_proximo_pago + 'T12:00:00')
-      d.setMonth(d.getMonth() + 1)
-      siguienteFecha = d.toISOString().split('T')[0]
-    }
+    const siguienteFecha = compromiso.fecha_proximo_pago
+      ? addMonthsToISODate(compromiso.fecha_proximo_pago, 1)
+      : null
 
     const { error } = await supabase
       .from('compromisos')
@@ -497,7 +513,7 @@ export async function crearAcuerdoPago(
   if (!user) return { error: 'No autenticado' }
 
   const monto_acordado = parseFloat(formData.get('monto_acordado') as string)
-  const fecha_acuerdo = (formData.get('fecha_acuerdo') as string) || new Date().toISOString().split('T')[0]
+  const fecha_acuerdo = (formData.get('fecha_acuerdo') as string) || getTodayLocalISO()
   const fecha_limite = formData.get('fecha_limite') as string
   const notas = (formData.get('notas') as string) || null
 
@@ -536,7 +552,8 @@ export async function registrarAbono(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
+  const formaPago = await getCuentaFormaPago(supabase, user.id, cuentaId)
 
   // Obtener nombre del compromiso para la descripción
   const { data: compromiso } = await supabase
@@ -555,6 +572,7 @@ export async function registrarAbono(
     fecha: hoy,
     descripcion: `Abono acuerdo: ${compromiso?.nombre ?? ''}`,
     cuenta_id: cuentaId,
+    forma_pago: formaPago,
   })
 
   if (txError) return { error: txError.message }
@@ -605,7 +623,7 @@ export async function registrarPagoLinea(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   // 1. Insertar en pagos_linea
   const { error: insertError } = await supabase.from('pagos_linea').insert({
@@ -664,14 +682,9 @@ export async function pagarDesdePrestamo(
   const montoPagado = Number(compromiso.monto_mensualidad ?? 0)
 
   // Calcular siguiente fecha de pago (+1 mes)
-  let siguienteFecha: string | null = null
-  if (fechaAnterior) {
-    const d = new Date(fechaAnterior + 'T12:00:00')
-    d.setMonth(d.getMonth() + 1)
-    siguienteFecha = d.toISOString().split('T')[0]
-  }
+  const siguienteFecha = fechaAnterior ? addMonthsToISODate(fechaAnterior, 1) : null
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   // 1. Crear transacción de pago del compromiso original
   const { data: txData, error: txError } = await supabase
@@ -683,6 +696,7 @@ export async function pagarDesdePrestamo(
       tipo: 'gasto' as const,
       descripcion: `Pago (préstamo de ${prestamista}): ${compromiso.nombre}`,
       fecha: hoy,
+      forma_pago: 'prestamo',
     })
     .select('id')
     .single()
@@ -736,7 +750,7 @@ export async function pagarLineaDesdePrestamo(
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   // 1. Insertar en pagos_linea
   const { error: insertError } = await supabase.from('pagos_linea').insert({
@@ -864,7 +878,7 @@ export async function registrarDisposicionEfectivo(
       ? rawOverride
       : monto / mensualidades_totales
   const saldo_pendiente = monto_mensualidad * mensualidades_totales
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   // 1. INSERT cargos_linea
   const { error: cargoError } = await supabase.from('cargos_linea').insert({
@@ -925,7 +939,7 @@ export async function registrarPrestamoPersonal(
   const montoDevolucion = isNaN(rawDevolucion) || rawDevolucion <= 0 ? montoRecibido : rawDevolucion
 
   const hoy = new Date()
-  const hoyStr = hoy.toISOString().split('T')[0]
+  const hoyStr = getTodayLocalISO(hoy)
 
   // 1. Incrementar saldo
   if (cuentaDestinoId) {
@@ -972,7 +986,7 @@ export async function registrarPrestamoPersonal(
     } else {
       primerPago.setMonth(primerPago.getMonth() + 1)
     }
-    const fechaProximoPago = primerPago.toISOString().split('T')[0]
+    const fechaProximoPago = formatISODateLocal(primerPago)
 
     await supabase.from('compromisos').insert({
       usuario_id: user.id,
@@ -1014,7 +1028,8 @@ export async function registrarPrestamoDado(
   if (isNaN(montoPrestado) || montoPrestado <= 0) return { error: 'Ingresa un monto válido' }
   const montoARecuperar = isNaN(rawRecuperar) || rawRecuperar <= 0 ? montoPrestado : rawRecuperar
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
+  const formaPago = await getCuentaFormaPago(supabase, user.id, cuentaOrigenId)
 
   // 1. INSERT prestamos_dados
   const { error: insertError } = await supabase.from('prestamos_dados').insert({
@@ -1046,6 +1061,7 @@ export async function registrarPrestamoDado(
     descripcion: `Préstamo a ${deudor}`,
     categoria: 'prestamo_dado',
     cuenta_id: cuentaOrigenId,
+    forma_pago: formaPago,
     es_recurrente: false,
   })
 
@@ -1087,7 +1103,7 @@ export async function registrarAbonoPrestamoDado(
 
   if (updateError) return { error: updateError.message }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = getTodayLocalISO()
 
   // 2. Incrementar saldo si se especificó cuenta
   if (cuentaId) {
@@ -1104,6 +1120,84 @@ export async function registrarAbonoPrestamoDado(
     cuenta_id: cuentaId,
     es_recurrente: false,
   })
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
+export async function actualizarPrestamoDado(
+  prestamoId: string,
+  formData: FormData
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const deudor = ((formData.get('deudor') as string) || '').trim()
+  const rawRecuperar = parseFloat(formData.get('monto_a_recuperar') as string)
+  const fechaDevolucion = (formData.get('fecha_devolucion') as string) || null
+  const notas = ((formData.get('notas') as string) || '').trim() || null
+
+  if (!deudor) return { error: 'Indica el nombre del deudor' }
+  if (isNaN(rawRecuperar) || rawRecuperar <= 0) {
+    return { error: 'Ingresa un monto a recuperar válido' }
+  }
+
+  const { data: prestamoActual, error: fetchError } = await supabase
+    .from('prestamos_dados')
+    .select('monto_recuperado')
+    .eq('id', prestamoId)
+    .eq('usuario_id', user.id)
+    .single()
+
+  if (fetchError || !prestamoActual) return { error: 'Préstamo no encontrado' }
+
+  const montoRecuperado = Number(prestamoActual.monto_recuperado ?? 0)
+  if (rawRecuperar < montoRecuperado) {
+    return { error: 'El monto a recuperar no puede ser menor a lo ya recuperado' }
+  }
+
+  const nuevoEstado =
+    montoRecuperado === 0
+      ? 'pendiente'
+      : montoRecuperado >= rawRecuperar
+      ? 'recuperado'
+      : 'parcial'
+
+  const { error } = await supabase
+    .from('prestamos_dados')
+    .update({
+      deudor,
+      monto_a_recuperar: rawRecuperar,
+      fecha_devolucion: fechaDevolucion,
+      notas,
+      estado: nuevoEstado,
+    })
+    .eq('id', prestamoId)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/compromisos')
+  return {}
+}
+
+export async function eliminarPrestamoDado(prestamoId: string): Promise<ActionResult> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await supabase
+    .from('prestamos_dados')
+    .update({ activo: false })
+    .eq('id', prestamoId)
+    .eq('usuario_id', user.id)
+
+  if (error) return { error: error.message }
 
   revalidatePath('/compromisos')
   return {}

@@ -5,6 +5,7 @@ import {
   getIngresoRecurrenceBaseDate,
   resolveIngresoDiaDelMes,
 } from '@/lib/ingresos'
+import { getTodayLocalISO } from '@/lib/local-date'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -444,7 +445,7 @@ export async function eliminarIngreso(
 
   // Si 'todos_siguientes': eliminar instancias futuras no confirmadas de la misma serie
   if (alcance === 'todos_siguientes' && ingreso.es_recurrente) {
-    const hoy = new Date().toISOString().split('T')[0]
+    const hoy = getTodayLocalISO()
     await supabase
       .from('ingresos')
       .delete()

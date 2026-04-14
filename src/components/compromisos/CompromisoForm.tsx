@@ -8,6 +8,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { crearCompromiso, actualizarCompromiso } from '@/app/(dashboard)/compromisos/actions'
 import MontoInput from '@/components/ui/MontoInput'
+import {
+  formatISODateForLocale,
+  formatISODateLocal,
+  parseISODateLocal,
+} from '@/lib/local-date'
 import type { Database } from '@/types/database'
 import type { TipoPago } from '@/types/finus'
 
@@ -110,7 +115,7 @@ const FREQ_DIVISOR: Record<string, number> = {
 }
 
 function calcFechaFin(fechaInicio: string, pagos: number, frecuencia: string): string {
-  const base = new Date(fechaInicio + 'T12:00:00')
+  const base = parseISODateLocal(fechaInicio)
   if (frecuencia === 'mensual') {
     base.setMonth(base.getMonth() + (pagos - 1))
   } else if (frecuencia === 'anual') {
@@ -118,12 +123,12 @@ function calcFechaFin(fechaInicio: string, pagos: number, frecuencia: string): s
   } else {
     base.setDate(base.getDate() + (pagos - 1) * (FREQ_DIVISOR[frecuencia] ?? 30))
   }
-  return base.toISOString().split('T')[0]
+  return formatISODateLocal(base)
 }
 
 function calcPagosRestantes(fechaInicio: string, fechaFin: string, frecuencia: string): number {
-  const inicio = new Date(fechaInicio + 'T12:00:00')
-  const fin = new Date(fechaFin + 'T12:00:00')
+  const inicio = parseISODateLocal(fechaInicio)
+  const fin = parseISODateLocal(fechaFin)
   const dias = Math.round((fin.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
   const divisor = FREQ_DIVISOR[frecuencia] ?? 30
   return Math.max(1, Math.ceil((dias + 1) / divisor))
@@ -220,7 +225,7 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
     const n = parseInt(form.mensualidades_restantes)
     if (isNaN(n) || n <= 0) return null
     const fechaStr = calcFechaFin(form.fecha_proximo_pago, n, form.frecuencia)
-    return new Date(fechaStr + 'T12:00:00').toLocaleDateString('es-MX', {
+    return formatISODateForLocale(fechaStr, {
       day: 'numeric',
       month: 'short',
       year: 'numeric',

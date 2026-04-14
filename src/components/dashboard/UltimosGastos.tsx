@@ -1,5 +1,5 @@
 import { Receipt } from 'lucide-react'
-import { formatMXN } from '@/lib/format'
+import { formatFecha, formatMXN } from '@/lib/format'
 import type { Database } from '@/types/database'
 
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
@@ -17,13 +17,6 @@ const CATEGORIA_LABEL: Record<string, string> = {
   imprevisto: 'Imprevisto',
   varios_efectivo: 'Varios efectivo',
   otro: 'Otro',
-}
-
-function formatRecentDate(value: string): string {
-  return new Date(`${value}T12:00:00`).toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  })
 }
 
 interface Props {
@@ -71,7 +64,7 @@ export default function UltimosGastos({ gastos }: Props) {
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   {categoria && <span>{categoria}</span>}
                   {categoria && <span>·</span>}
-                  <span>{formatRecentDate(gasto.fecha)}</span>
+                  <span>{formatFecha(gasto.fecha)}</span>
                 </div>
               </div>
 

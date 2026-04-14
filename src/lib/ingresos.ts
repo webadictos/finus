@@ -1,4 +1,5 @@
 import type { Database } from '@/types/database'
+import { formatISODateLocal, getTodayLocalISO, parseISODateLocal } from '@/lib/local-date'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 
@@ -36,7 +37,7 @@ function normalizeDate(date: Date): Date {
 }
 
 function toISODate(date: Date): string {
-  return normalizeDate(date).toISOString().split('T')[0]
+  return formatISODateLocal(normalizeDate(date))
 }
 
 function getLastDayOfMonth(year: number, monthIndex: number): number {
@@ -235,15 +236,14 @@ export function calcularSiguienteFechaIngreso(
       break
   }
 
-  return d.toISOString().split('T')[0]
+  return formatISODateLocal(d)
 }
 
 export function getProjectedRecurringIngresos(
   ingresos: Ingreso[],
   horizonDays = 30
 ): Ingreso[] {
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
+  const hoy = parseISODateLocal(getTodayLocalISO())
 
   const limite = new Date(hoy)
   limite.setDate(limite.getDate() + horizonDays)

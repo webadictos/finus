@@ -8,6 +8,7 @@ import Badge from '@/components/shared/Badge'
 import GastoPrevistoCard from '@/components/proyeccion/GastoPrevistoCard'
 import GastoPrevistoForm from '@/components/proyeccion/GastoPrevistoForm'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
+import { getCurrentMonthKey, getTodayLocalISO, parseISODateLocal } from '@/lib/local-date'
 import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
 
@@ -54,17 +55,15 @@ const PROB_VARIANT: Record<string, BadgeVariant> = {
 
 function fechaEnPeriodo(fecha: string | null, limitDate: Date): boolean {
   if (!fecha) return false
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const f = new Date(fecha + 'T12:00:00')
+  const hoy = parseISODateLocal(getTodayLocalISO())
+  const f = parseISODateLocal(fecha)
   return f >= hoy && f <= limitDate
 }
 
 function fechaVencida(fecha: string | null): boolean {
   if (!fecha) return false
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
-  const f = new Date(fecha + 'T12:00:00')
+  const hoy = parseISODateLocal(getTodayLocalISO())
+  const f = parseISODateLocal(fecha)
   return f < hoy
 }
 
@@ -135,9 +134,7 @@ export default function ProyeccionClient({
     if (fecha) return fechaEnPeriodo(fecha, limite)
     // Sin fecha: previsto_sin_fecha con mes actual entra siempre
     if (g.tipo_programacion === 'previsto_sin_fecha' && g.mes) {
-      const hoy = new Date()
-      const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
-      return g.mes === mesActual
+      return g.mes === getCurrentMonthKey()
     }
     return false
   })

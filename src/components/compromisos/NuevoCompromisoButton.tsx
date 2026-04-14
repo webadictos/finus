@@ -10,16 +10,20 @@ type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 
 interface Props {
   tarjetas: Tarjeta[]
+  label?: string
 }
 
-export default function NuevoCompromisoButton({ tarjetas }: Props) {
+export default function NuevoCompromisoButton({
+  tarjetas,
+  label = 'Nuevo compromiso',
+}: Props) {
   const [open, setOpen] = useState(false)
 
   return (
     <>
       <Button onClick={() => setOpen(true)}>
         <Plus />
-        Nuevo compromiso
+        {label}
       </Button>
 
       <CompromisoForm open={open} onOpenChange={setOpen} tarjetas={tarjetas} />

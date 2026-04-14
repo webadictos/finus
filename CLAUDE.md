@@ -62,7 +62,7 @@ src/
 │   │   │   ├── page.tsx              — Server Component: fetch compromisos + cuentas + tarjetas
 │   │   │   └── actions.ts            — crearCompromiso, actualizarCompromiso, marcarPagado
 │   │   ├── gastos/
-│   │   │   ├── page.tsx              — Server Component: fetch transacciones mes actual
+│   │   │   ├── page.tsx              — Server Component: fetch transacciones por periodo/pago vía searchParams
 │   │   │   └── actions.ts            — registrarGasto → insert transacción + decrementar_saldo
 │   │   ├── ingresos/
 │   │   │   ├── page.tsx              — Server Component: fetch ingresos + cuentas + proyección recurrente
@@ -113,7 +113,7 @@ src/
 │   │   └── RecomendacionBadge.tsx    — Muestra el resultado de getRecomendacion() con color
 │   ├── gastos/
 │   │   ├── GastoCard.tsx             — Fila de transacción con icono por categoría + etiquetas legibles
-│   │   ├── GastosClient.tsx          — Client Component: agrupa por fecha, KPIs, abre form
+│   │   ├── GastosClient.tsx          — Client Component: filtros por periodo/pago, KPIs, agrupación por fecha, abre form
 │   │   └── RegistrarGastoForm.tsx    — Sheet para registrar gasto rápido + subcategoria/momento_del_dia
 │   ├── ingresos/
 │   │   ├── IngresoCard.tsx           — Card con estado, badges, botón "Confirmar recibido"
@@ -132,13 +132,15 @@ src/
 │   ├── security/
 │   │   └── IdleLockOverlay.tsx       — Bloqueo tras inactividad + unlock por passkey/contraseña
 │   └── proyeccion/
-│       ├── ProyeccionClient.tsx      — Client Component: selector horizonte (7/15/30/45d), saldo proyectado
+│       ├── ProyeccionClient.tsx      — Client Component: tabs Resumen/Gastos previstos, selector horizonte (7/15/30/45d), saldo proyectado
 │       ├── GastoPrevistoCard.tsx     — Card con certeza, fecha, botón confirmar fecha
 │       ├── GastoPrevistoForm.tsx     — Sheet para crear/editar gasto previsto
 │       └── ConfirmarFechaModal.tsx   — Modal para confirmar fecha de un gasto previsto
 │
 ├── lib/
 │   ├── format.ts                     — formatMXN(), formatFecha(), diasHastaFecha()
+│   ├── local-date.ts                 — Helpers de fecha local (`YYYY-MM-DD`) sin corrimiento por UTC
+│   ├── gastos-filters.ts             — Periodos y filtros de forma de pago para `/gastos`
 │   ├── ingresos.ts                   — Utilidades de recurrencia/proyección de ingresos
 │   ├── presupuesto.ts                — Reserva operativa y helpers de presupuesto operativo
 │   ├── recommendations.ts            — getRecomendacion(), getRecomendaciones() — lógica de pagos
@@ -394,7 +396,7 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | tarjeta_id                    | uuid\|null  | FK → tarjetas                                          |
 | compromiso_id                 | uuid\|null  | FK → compromisos                                       |
 | proyecto_proveedor_id         | uuid\|null  | FK → proyecto_proveedores                              |
-| forma_pago                    | text\|null  |                                                        |
+| forma_pago                    | text\|null  | Se llena también desde pagos/abonos de compromisos para no caer en `otro` cuando el método ya se conoce |
 | meses_msi                     | int\|null   |                                                        |
 | es_recurrente                 | boolean     |                                                        |
 | notas                         | text\|null  |                                                        |
@@ -457,6 +459,9 @@ Tipadas en `database.ts` bajo `Functions` para que `.rpc()` no de error de TypeS
 > `saldoLibre = saldoDisponible - reservaOperativa` en lugar del saldo bruto.
 > Esto hace que Finus reserve automáticamente lo necesario para gastos básicos antes
 > de comprometer liquidez en pagos de deuda.
+>
+> Las fechas que aparecen en mensajes como “Espera al 15 abr” deben salir de `formatFecha()`
+> para no depender de parseos UTC del navegador.
 
 **Factores de ponderación:**
 

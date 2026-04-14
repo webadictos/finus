@@ -2,13 +2,18 @@
 
 import { useState, useTransition } from 'react'
 import { Dialog } from 'radix-ui'
-import { X } from 'lucide-react'
+import { Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Badge from '@/components/shared/Badge'
 import ProgressBar from '@/components/shared/ProgressBar'
-import { registrarAbonoPrestamoDado } from '@/app/(dashboard)/compromisos/actions'
+import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
+import PrestamoDadoForm from '@/components/compromisos/PrestamoDadoForm'
+import {
+  eliminarPrestamoDado,
+  registrarAbonoPrestamoDado,
+} from '@/app/(dashboard)/compromisos/actions'
 import { formatMXN, formatFecha, diasHastaFecha } from '@/lib/format'
 import type { Database } from '@/types/database'
 import type { BadgeVariant } from '@/components/shared/Badge'
@@ -36,6 +41,8 @@ const ESTADO_LABEL: Record<string, string> = {
 }
 
 export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [abonoOpen, setAbonoOpen] = useState(false)
   const [montoAbono, setMontoAbono] = useState('')
   const [cuentaId, setCuentaId] = useState('')
@@ -88,6 +95,17 @@ export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
     })
   }
 
+  const handleEliminar = () => {
+    startTransition(async () => {
+      const result = await eliminarPrestamoDado(prestamo.id)
+      if (result.error) {
+        setAbonoError(result.error)
+      } else {
+        setDeleteOpen(false)
+      }
+    })
+  }
+
   return (
     <>
       <div className="rounded-xl border bg-card px-5 py-4 flex flex-col gap-3">
@@ -100,16 +118,24 @@ export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
             </Badge>
             {urgenciaVariant && <Badge variant={urgenciaVariant}>{urgenciaLabel}</Badge>}
           </div>
-          {prestamo.estado !== 'recuperado' && prestamo.estado !== 'incobrable' && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs h-7 px-2.5 shrink-0"
-              onClick={() => { setAbonoOpen(true); setMontoAbono(String(pendiente)) }}
-            >
-              Registrar abono
+          <div className="flex items-center gap-1 shrink-0">
+            {prestamo.estado !== 'recuperado' && prestamo.estado !== 'incobrable' && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 px-2.5 shrink-0"
+                onClick={() => { setAbonoOpen(true); setMontoAbono(String(pendiente)) }}
+              >
+                Registrar abono
+              </Button>
+            )}
+            <Button variant="ghost" size="icon-sm" onClick={() => setEditOpen(true)}>
+              <Pencil className="size-3.5" />
             </Button>
-          )}
+            <Button variant="ghost" size="icon-sm" onClick={() => setDeleteOpen(true)}>
+              <Trash2 className="size-3.5 text-destructive" />
+            </Button>
+          </div>
         </div>
 
         {/* Montos */}
@@ -169,6 +195,13 @@ export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
       </div>
 
       {/* Modal de abono */}
+      <PrestamoDadoForm
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        cuentas={cuentas}
+        prestamo={prestamo}
+      />
+
       <Dialog.Root open={abonoOpen} onOpenChange={(v) => { if (!isPending) { setAbonoOpen(v); if (!v) { setMontoAbono(''); setCuentaId(''); setAbonoError(null) } } }}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
@@ -245,6 +278,17 @@ export default function PrestamoDadoCard({ prestamo, cuentas }: Props) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+
+      <ConfirmarAccionModal
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        titulo="Eliminar préstamo dado"
+        descripcion={`¿Ocultar el registro de "${prestamo.deudor}"? Esto dejará de mostrarlo en "Dinero que te deben", pero no modificará tu historial de transacciones.`}
+        labelConfirmar="Eliminar"
+        variante="destructive"
+        onConfirm={handleEliminar}
+        loading={isPending}
+      />
     </>
   )
 }

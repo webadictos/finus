@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { eliminarGasto } from '@/app/(dashboard)/gastos/actions'
-import { formatMXN } from '@/lib/format'
+import { formatFecha, formatMXN } from '@/lib/format'
 import { parseTags, type TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
@@ -100,10 +100,7 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
   const monto = Number(transaccion.monto ?? 0)
   const categoria = transaccion.categoria ?? 'otro'
   const Icon = CATEGORIA_ICONS[categoria] ?? Tag
-  const fechaDisplay = new Date(transaccion.fecha + 'T12:00:00').toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-  })
+  const fechaDisplay = formatFecha(transaccion.fecha)
 
   const handleEliminar = () => {
     startTransition(async () => {

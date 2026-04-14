@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getTodayLocalISO } from '@/lib/local-date'
 import { revalidatePath } from 'next/cache'
 import type { Json } from '@/types/database'
 
@@ -26,7 +27,7 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
   const cuentaId = (formData.get('cuenta_id') as string) || null
   const tarjetaId = (formData.get('tarjeta_id') as string) || null
   const mesesMsi = formData.get('meses_msi')
-  const fecha = (formData.get('fecha') as string) || new Date().toISOString().split('T')[0]
+  const fecha = (formData.get('fecha') as string) || getTodayLocalISO()
   const momentoDelDia = ((formData.get('momento_del_dia') as MomentoDelDia | null) || null)
 
   const monto = parseFloat(formData.get('monto') as string) || 0
@@ -132,7 +133,7 @@ export async function actualizarGasto(
     .from('transacciones')
     .update({
       monto: montoNuevo,
-      fecha: (formData.get('fecha') as string) || new Date().toISOString().split('T')[0],
+      fecha: (formData.get('fecha') as string) || getTodayLocalISO(),
       descripcion: ((formData.get('descripcion') as string) || '').trim() || null,
       categoria: (formData.get('categoria') as string) || null,
       subcategoria: ((formData.get('subcategoria') as string) || '').trim() || null,

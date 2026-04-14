@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { formatMXN, formatFecha } from '@/lib/format'
+import { diffCalendarDays, getTodayLocalISO } from '@/lib/local-date'
 import { getRecomendacion } from '@/lib/recommendations'
 import PagarModal from '@/components/compromisos/PagarModal'
 import { Button } from '@/components/ui/button'
@@ -27,18 +28,15 @@ export default function CompromisosVencidos({
 }: Props) {
   const [pagarOpen, setPagarOpen] = useState<string | null>(null)
 
-  const hoy = new Date()
-  hoy.setHours(0, 0, 0, 0)
+  const hoy = getTodayLocalISO()
 
   const vencidos = compromisos
     .filter((c) => {
       if (!c.activo || !c.fecha_proximo_pago) return false
-      const fecha = new Date(c.fecha_proximo_pago + 'T00:00:00')
-      return fecha < hoy
+      return c.fecha_proximo_pago < hoy
     })
     .map((c) => {
-      const fecha = new Date(c.fecha_proximo_pago! + 'T00:00:00')
-      const diasAtrasado = Math.floor((hoy.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24))
+      const diasAtrasado = Math.abs(diffCalendarDays(c.fecha_proximo_pago!, hoy))
       return { compromiso: c, diasAtrasado }
     })
     .sort((a, b) => b.diasAtrasado - a.diasAtrasado)

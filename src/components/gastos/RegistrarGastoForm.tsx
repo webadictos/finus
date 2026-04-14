@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useMemo, useEffect } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { Dialog } from 'radix-ui'
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
 import MontoInput from '@/components/ui/MontoInput'
 import TagInput from '@/components/ui/TagInput'
+import { getTodayLocalISO } from '@/lib/local-date'
 import { parseTags, type TagItem } from '@/lib/tags'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
 import type { Database } from '@/types/database'
@@ -77,10 +78,7 @@ interface FormState {
 }
 
 function todayISO() {
-  const now = new Date()
-  const offset = now.getTimezoneOffset()
-  const local = new Date(now.getTime() - offset * 60000)
-  return local.toISOString().split('T')[0]
+  return getTodayLocalISO()
 }
 
 function initialForm(tx?: Transaccion | null): FormState {
@@ -137,18 +135,16 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  // Al abrir el form por primera vez (no edición), preseleccionar cuenta predeterminada
-  useEffect(() => {
-    if (!open || isEditing) return
-    const cuentaPred = localStorage.getItem(STORAGE_KEY_CUENTA)
-    if (cuentaPred && cuentas.some((c) => c.id === cuentaPred)) {
-      setForm((p) => ({ ...p, cuenta_id: p.cuenta_id || cuentaPred }))
-    }
-  }, [open, isEditing, cuentas])
-
   const handleOpenChange = (next: boolean) => {
     if (next) {
-      setForm(initialForm(transaccion))
+      const nextForm = initialForm(transaccion)
+      if (!isEditing && !nextForm.cuenta_id) {
+        const cuentaPred = localStorage.getItem(STORAGE_KEY_CUENTA)
+        if (cuentaPred && cuentas.some((c) => c.id === cuentaPred)) {
+          nextForm.cuenta_id = cuentaPred
+        }
+      }
+      setForm(nextForm)
       setError(null)
     }
     onOpenChange(next)

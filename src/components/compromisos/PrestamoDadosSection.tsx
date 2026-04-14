@@ -21,26 +21,19 @@ export default function PrestamoDadosSection({ prestamos, cuentas }: Props) {
   return (
     <>
       <div className="flex flex-col gap-3">
-        {/* Divider + Header */}
-        <div className="flex items-center gap-3 pt-2">
-          <div className="flex-1 border-t" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-            Dinero que te deben
-          </span>
-          <div className="flex-1 border-t" />
-        </div>
-
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <HandCoins className="size-4 text-muted-foreground" />
-            <span className="text-sm font-semibold text-muted-foreground">
-              {prestamos.length} préstamo{prestamos.length !== 1 ? 's' : ''} activo{prestamos.length !== 1 ? 's' : ''}
-            </span>
+            <div>
+              <h2 className="text-sm font-semibold">Dinero que te deben</h2>
+              <p className="text-xs text-muted-foreground">
+                {prestamos.length} préstamo{prestamos.length !== 1 ? 's' : ''} activo{prestamos.length !== 1 ? 's' : ''}
+              </p>
+            </div>
           </div>
           <Button
-            variant="outline"
             size="sm"
-            className="gap-1.5 text-xs"
+            className="gap-1.5 text-xs shrink-0"
             onClick={() => setFormOpen(true)}
           >
             <Plus className="size-3.5" />

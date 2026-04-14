@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { crearAcuerdoPago } from '@/app/(dashboard)/compromisos/actions'
+import { getTodayLocalISO } from '@/lib/local-date'
 
 interface Props {
   open: boolean
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export default function AcuerdoPagoForm({ open, onOpenChange, compromisoId, compromisoNombre }: Props) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayLocalISO()
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 

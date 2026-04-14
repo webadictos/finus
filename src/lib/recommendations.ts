@@ -1,11 +1,11 @@
 import type {
-  TipoPago,
   CompromisoParaRecomendacion,
   IngresoProximo,
   Recomendacion,
   ColorRecomendacion,
   LineaParaRecomendacion,
 } from '@/types/finus'
+import { formatFecha } from '@/lib/format'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -250,7 +250,7 @@ function recomendarRevolvente(
   )
   if (ingreso) {
     return {
-      accion: `Espera al ${new Date(ingreso.fecha_esperada).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} — llega ${ingreso.nombre}`,
+      accion: `Espera al ${formatFecha(ingreso.fecha_esperada)} — llega ${ingreso.nombre}`,
       detalle: `Ingreso de ${formatMXN(ingreso.monto)} llega antes del vencimiento`,
       color: 'morado',
       monto_sugerido: minimo,
@@ -521,7 +521,7 @@ function recomendarLinea(
   const ingreso = ingresoAntesDelVencimiento(linea.fecha_proximo_pago, ingresoProximo)
   if (ingreso) {
     return {
-      accion: `Espera al ${new Date(ingreso.fecha_esperada).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} — llega ${ingreso.nombre}`,
+      accion: `Espera al ${formatFecha(ingreso.fecha_esperada)} — llega ${ingreso.nombre}`,
       detalle: `Ingreso de ${formatMXN(ingreso.monto)} llega antes del vencimiento`,
       color: 'morado',
       monto_sugerido: minimo,
