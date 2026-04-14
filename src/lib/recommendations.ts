@@ -5,7 +5,7 @@ import type {
   ColorRecomendacion,
   LineaParaRecomendacion,
 } from '@/types/finus'
-import { formatFecha } from '@/lib/format'
+import { formatFecha, formatMXN } from '@/lib/format'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -14,17 +14,6 @@ const FACTOR_COLCHON = 0.20
 
 /** Días hacia adelante para considerar un ingreso "próximo" */
 const DIAS_VENTANA_INGRESO = 10
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatMXN(monto: number): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(monto)
-}
 
 function calcularInteresEstimado(
   monto: number,

@@ -292,6 +292,12 @@ export async function crearCompromiso(formData: FormData): Promise<ActionResult>
   if (!user) return { error: 'No autenticado' }
 
   const tipo_pago = formData.get('tipo_pago') as TipoPago
+  if (['revolvente', 'msi', 'disposicion_efectivo'].includes(tipo_pago)) {
+    return {
+      error: 'Los compromisos de crédito revolvente, MSI y disposición de efectivo ahora se registran desde "Líneas de crédito".',
+    }
+  }
+
   const tasaAnual = parseFloat(formData.get('tasa_interes_anual') as string)
   const tarjetaId = (formData.get('tarjeta_id') as string) || null
 

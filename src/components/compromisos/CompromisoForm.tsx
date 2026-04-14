@@ -28,6 +28,9 @@ const TIPO_PAGO_OPTIONS: { value: TipoPago; label: string }[] = [
   { value: 'disposicion_efectivo', label: 'Disposición de efectivo — intereses desde día 1' },
 ]
 
+const NUEVO_COMPROMISO_OPTIONS: TipoPago[] = ['fijo', 'prestamo', 'suscripcion']
+const LEGACY_CREDIT_OPTIONS: TipoPago[] = ['revolvente', 'msi', 'disposicion_efectivo']
+
 const FRECUENCIA_OPTIONS = [
   { value: 'mensual', label: 'Mensual' },
   { value: 'quincenal', label: 'Quincenal' },
@@ -218,6 +221,10 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
   const isMSI = form.tipo_pago === 'msi'
   const isPrestamo = form.tipo_pago === 'prestamo'
   const isEditing = !!compromiso
+  const tipoPagoOptions = TIPO_PAGO_OPTIONS.filter((option) => {
+    if (NUEVO_COMPROMISO_OPTIONS.includes(option.value)) return true
+    return isEditing && LEGACY_CREDIT_OPTIONS.includes(option.value) && option.value === compromiso?.tipo_pago
+  })
 
   // Computed display values for liquidation fields
   const fechaFinCalculada = (() => {
@@ -285,7 +292,7 @@ export default function CompromisoForm({ open, onOpenChange, compromiso, tarjeta
                   className={selectClass}
                   required
                 >
-                  {TIPO_PAGO_OPTIONS.map((o) => (
+                  {tipoPagoOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>

@@ -1,17 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { formatMXN } from '@/lib/format'
 import { createClient } from '@/lib/supabase/server'
 import { getRecomendacion } from '@/lib/recommendations'
 import type { CompromisoParaRecomendacion, IngresoProximo } from '@/types/finus'
 
 const PROB_FACTOR: Record<string, number> = { alta: 0.9, media: 0.5, baja: 0.2 }
-
-function formatMXN(n: number) {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-    minimumFractionDigits: 0,
-  }).format(n)
-}
 
 export async function POST(): Promise<Response> {
   // ── Auth ──────────────────────────────────────────────────────────────────
