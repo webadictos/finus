@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Settings } from 'lucide-react'
 import MobileNav from '@/components/dashboard/MobileNav'
 import IdleLockOverlay from '@/components/security/IdleLockOverlay'
@@ -19,8 +19,7 @@ interface Props {
 }
 
 const PULL_THRESHOLD = 72
-const MAX_PULL = 104
-const PULL_START_THRESHOLD = 14
+const PULL_START_THRESHOLD = 28
 
 export default function DashboardShell({
   children,
@@ -29,11 +28,11 @@ export default function DashboardShell({
   email,
 }: Props) {
   const router = useRouter()
+  const pathname = usePathname()
   const mainRef = useRef<HTMLElement | null>(null)
   const startYRef = useRef<number | null>(null)
   const startXRef = useRef<number | null>(null)
   const draggingRef = useRef(false)
-  const interceptingRef = useRef(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [armed, setArmed] = useState(false)
   const [showRefresh, setShowRefresh] = useState(false)
@@ -43,16 +42,16 @@ export default function DashboardShell({
     const main = mainRef.current
     if (!main) return
 
+    const enablePullToRefresh = pathname === '/'
     const isMobileTouch =
       typeof window !== 'undefined' &&
       window.matchMedia('(pointer: coarse)').matches &&
       window.matchMedia('(max-width: 767px)').matches
 
-    if (!isMobileTouch) return
+    if (!isMobileTouch || !enablePullToRefresh) return
 
     const resetPull = () => {
       draggingRef.current = false
-      interceptingRef.current = false
       startYRef.current = null
       startXRef.current = null
       setPullDistance(0)
@@ -86,10 +85,8 @@ export default function DashboardShell({
         return
       }
 
-      interceptingRef.current = true
-
-      const nextPull = Math.min((deltaY - PULL_START_THRESHOLD) * 0.28, MAX_PULL)
-      if (interceptingRef.current) {
+      const nextPull = Math.min(deltaY - PULL_START_THRESHOLD, PULL_THRESHOLD + 8)
+      if (nextPull >= PULL_THRESHOLD) {
         event.preventDefault()
       }
       setPullDistance(nextPull)
@@ -121,7 +118,7 @@ export default function DashboardShell({
       main.removeEventListener('touchend', handleTouchEnd)
       main.removeEventListener('touchcancel', resetPull)
     }
-  }, [armed, router, showRefresh])
+  }, [armed, pathname, router, showRefresh])
 
   useEffect(() => {
     if (!showRefresh || isRefreshing) return
@@ -168,12 +165,6 @@ export default function DashboardShell({
 
           <div
             className="transition-transform duration-200 ease-out"
-            style={{
-              transform:
-                showRefresh || pullDistance > 0
-                  ? `translateY(${showRefresh ? 20 : pullDistance}px)`
-                  : undefined,
-            }}
           >
             {children}
           </div>

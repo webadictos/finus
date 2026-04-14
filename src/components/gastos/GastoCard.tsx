@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import {
   UtensilsCrossed,
   Fuel,
@@ -96,6 +96,11 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [isMobile, setIsMobile] = useState(false)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const startXRef = useRef<number | null>(null)
+  const draggingRef = useRef(false)
+  const SWIPE_ACTION_WIDTH = 112
 
   const monto = Number(transaccion.monto ?? 0)
   const categoria = transaccion.categoria ?? 'otro'
@@ -112,67 +117,147 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
   const descripcionLabel =
     transaccion.descripcion || CATEGORIA_LABEL[categoria] || categoria
   const etiquetas = parseTags(transaccion.etiquetas)
+  const metadata = [
+    CATEGORIA_LABEL[categoria] ?? categoria,
+    transaccion.subcategoria
+      ? (SUBCATEGORIA_LABEL[transaccion.subcategoria] ?? transaccion.subcategoria)
+      : null,
+    transaccion.momento_del_dia
+      ? (MOMENTO_DEL_DIA_LABEL[transaccion.momento_del_dia] ?? transaccion.momento_del_dia)
+      : null,
+    transaccion.forma_pago
+      ? (FORMA_PAGO_LABEL[transaccion.forma_pago] ?? transaccion.forma_pago)
+      : null,
+    tarjetaNombre ?? null,
+  ].filter(Boolean) as string[]
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const media = window.matchMedia('(pointer: coarse) and (max-width: 767px)')
+    const apply = () => setIsMobile(media.matches)
+    apply()
+    media.addEventListener('change', apply)
+    return () => media.removeEventListener('change', apply)
+  }, [])
+
+  const handlePointerDown = (clientX: number) => {
+    if (!isMobile) return
+    startXRef.current = clientX
+    draggingRef.current = true
+  }
+
+  const handlePointerMove = (clientX: number) => {
+    if (!isMobile || !draggingRef.current || startXRef.current == null) return
+    const delta = clientX - startXRef.current
+    if (delta > 24) {
+      setSwipeOffset(0)
+      return
+    }
+    setSwipeOffset(Math.max(-SWIPE_ACTION_WIDTH, Math.min(0, delta)))
+  }
+
+  const handlePointerEnd = () => {
+    if (!isMobile || !draggingRef.current) return
+    draggingRef.current = false
+    startXRef.current = null
+    setSwipeOffset((current) => (Math.abs(current) > SWIPE_ACTION_WIDTH / 2 ? -SWIPE_ACTION_WIDTH : 0))
+  }
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-            <Icon className="size-4 text-muted-foreground" />
+      <div className="relative overflow-hidden rounded-2xl border bg-card">
+        {isMobile && (
+          <div className="absolute inset-y-0 right-0 flex w-28 items-stretch">
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="flex flex-1 flex-col items-center justify-center gap-1 bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+            >
+              <Pencil className="size-4" />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Editar</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteOpen(true)}
+              className="flex flex-1 flex-col items-center justify-center gap-1 bg-destructive/90 text-destructive-foreground transition-colors hover:bg-destructive"
+            >
+              <Trash2 className="size-4" />
+              <span className="text-[10px] font-medium uppercase tracking-wide">Borrar</span>
+            </button>
           </div>
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <span className="text-sm font-medium truncate">{descripcionLabel}</span>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span>{CATEGORIA_LABEL[categoria] ?? categoria}</span>
-              {transaccion.subcategoria && (
-                <>
-                  <span>·</span>
-                  <span>{SUBCATEGORIA_LABEL[transaccion.subcategoria] ?? transaccion.subcategoria}</span>
-                </>
-              )}
-              {transaccion.momento_del_dia && (
-                <>
-                  <span>·</span>
-                  <span>{MOMENTO_DEL_DIA_LABEL[transaccion.momento_del_dia] ?? transaccion.momento_del_dia}</span>
-                </>
-              )}
-              {transaccion.forma_pago && (
-                <>
-                  <span>·</span>
-                  <span>{FORMA_PAGO_LABEL[transaccion.forma_pago] ?? transaccion.forma_pago}</span>
-                </>
-              )}
-              {tarjetaNombre && (
-                <>
-                  <span>·</span>
-                  <span className="truncate max-w-[120px]">{tarjetaNombre}</span>
-                </>
-              )}
-              <span>·</span>
-              <span>{fechaDisplay}</span>
-            </div>
-            {etiquetas.length > 0 ? (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {etiquetas.map((tag) => (
-                  <span key={tag.slug} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" title={tag.slug}>
-                    {tag.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        )}
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-sm font-semibold tabular-nums text-destructive">
-            -{formatMXN(monto)}
-          </span>
-          <Button variant="ghost" size="icon-sm" onClick={() => setEditOpen(true)}>
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="size-3.5 text-destructive" />
-          </Button>
+        <div
+          className="relative bg-card transition-transform duration-200 ease-out"
+          style={{ transform: isMobile ? `translateX(${swipeOffset}px)` : undefined }}
+          onTouchStart={(event) => handlePointerDown(event.touches[0]?.clientX ?? 0)}
+          onTouchMove={(event) => handlePointerMove(event.touches[0]?.clientX ?? 0)}
+          onTouchEnd={handlePointerEnd}
+          onTouchCancel={handlePointerEnd}
+        >
+          <div className="flex items-start gap-3 px-4 py-3.5 md:items-center md:justify-between">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-2xl bg-muted md:mt-0">
+                <Icon className="size-4 text-muted-foreground" />
+              </div>
+
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="block truncate text-sm font-semibold md:text-[15px]">
+                      {descripcionLabel}
+                    </span>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground md:hidden">
+                      Desliza para editar o borrar
+                    </p>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <span className="block text-sm font-semibold tabular-nums text-destructive md:text-[15px]">
+                      -{formatMXN(monto)}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {fechaDisplay}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {metadata.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground md:text-[11px]"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+
+                {etiquetas.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {etiquetas.map((tag) => (
+                      <span
+                        key={tag.slug}
+                        className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary md:text-[11px]"
+                        title={tag.slug}
+                      >
+                        {tag.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="ml-2 hidden shrink-0 items-center gap-1 md:flex">
+              <Button variant="ghost" size="icon-sm" onClick={() => setEditOpen(true)}>
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon-sm" onClick={() => setDeleteOpen(true)}>
+                <Trash2 className="size-3.5 text-destructive" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
