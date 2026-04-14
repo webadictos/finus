@@ -132,7 +132,12 @@ interface Props {
   /** Si se pasa, el form entra en modo edición */
   transaccion?: Transaccion | null
   /** Llamado tras guardar exitosamente un nuevo gasto */
-  onSave?: (data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) => void
+  onSave?: (data: {
+    previstosCoincidentes?: PrevistoBasico[]
+    transaccionId?: string
+    cuentaAfectada?: { id: string; nombre: string; saldoActualizado: number } | null
+    saldoGlobalActualizado?: number | null
+  }) => void
 }
 
 const STORAGE_KEY_CUENTA = 'finus_cuenta_predeterminada'
@@ -212,6 +217,8 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
           onSave?.({
             previstosCoincidentes: result.previstosCoincidentes,
             transaccionId: result.transaccionId,
+            cuentaAfectada: result.cuentaAfectada,
+            saldoGlobalActualizado: result.saldoGlobalActualizado,
           })
         }
       }

@@ -75,6 +75,12 @@ export default async function GastosPage({ searchParams }: Props) {
       .eq('tipo', 'gasto')
       .not('etiquetas', 'is', null),
   ])
+  const { data: ingresosSinCuentaRes } = await supabase
+    .from('ingresos')
+    .select('monto_real, monto_esperado')
+    .eq('usuario_id', user.id)
+    .eq('estado', 'confirmado')
+    .is('cuenta_destino_id', null)
 
   // Aplanar y deduplicar todas las etiquetas usadas
   const etiquetasMap = new Map<string, TagItem>()
@@ -95,6 +101,10 @@ export default async function GastosPage({ searchParams }: Props) {
     }
     return tx.forma_pago === currentPayment
   })
+  const ingresosSinCuenta = (ingresosSinCuentaRes ?? []).reduce(
+    (sum, ingreso) => sum + Number(ingreso.monto_real ?? ingreso.monto_esperado ?? 0),
+    0
+  )
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
@@ -108,6 +118,7 @@ export default async function GastosPage({ searchParams }: Props) {
       <GastosClient
         transacciones={transacciones}
         cuentas={cuentasRes.data ?? []}
+        ingresosSinCuenta={ingresosSinCuenta}
         tarjetas={tarjetasRes.data ?? []}
         period={periodMeta.key as GastoPeriodKey}
         payment={currentPayment as GastoPaymentKey}

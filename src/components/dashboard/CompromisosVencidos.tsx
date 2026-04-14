@@ -61,6 +61,12 @@ export default function CompromisosVencidos({
 
   const vencidos = [...compromisosVencidos, ...lineasVencidas]
     .sort((a, b) => b.diasAtrasado - a.diasAtrasado)
+  const totalVencido = vencidos.reduce((sum, item) => {
+    if (item.kind === 'compromiso') {
+      return sum + Number(item.data.monto_mensualidad ?? item.data.pago_minimo ?? 0)
+    }
+    return sum + Number(item.data.pago_minimo ?? 0)
+  }, 0)
 
   if (vencidos.length === 0) return null
 
@@ -68,12 +74,17 @@ export default function CompromisosVencidos({
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4">
       <div className="flex items-center gap-2 mb-3">
         <AlertTriangle className="size-4 text-destructive" />
-        <h2 className="text-sm font-semibold text-destructive">
-          Compromisos vencidos a hoy{' '}
-          <span className="ml-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-xs font-medium text-destructive">
-            {vencidos.length}
-          </span>
-        </h2>
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-destructive">
+            Compromisos vencidos a hoy{' '}
+            <span className="ml-1 rounded-full bg-destructive/15 px-1.5 py-0.5 text-xs font-medium text-destructive">
+              {vencidos.length}
+            </span>
+          </h2>
+          <p className="text-xs font-medium text-destructive/90">
+            Total vencido: {formatMXN(totalVencido)}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">

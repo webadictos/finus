@@ -12,6 +12,8 @@ export type RegistrarGastoResult = {
   error?: string
   previstosCoincidentes?: PrevistoBasico[]
   transaccionId?: string
+  cuentaAfectada?: { id: string; nombre: string; saldoActualizado: number } | null
+  saldoGlobalActualizado?: number | null
 }
 
 type MomentoDelDia = 'desayuno' | 'almuerzo' | 'cena' | 'snack' | 'sin_clasificar'
@@ -72,22 +74,60 @@ export async function registrarGasto(formData: FormData): Promise<RegistrarGasto
   }
 
   // Buscar gastos previstos activos no realizados para sugerir vinculación
-  const { data: previstos } = await supabase
-    .from('gastos_previstos')
-    .select('id, nombre, monto_estimado')
-    .eq('usuario_id', user.id)
-    .eq('activo', true)
-    .eq('realizado', false)
+  const [previstosRes, cuentaAfectadaRes, cuentasRes, ingresosRes] = await Promise.all([
+    supabase
+      .from('gastos_previstos')
+      .select('id, nombre, monto_estimado')
+      .eq('usuario_id', user.id)
+      .eq('activo', true)
+      .eq('realizado', false),
+    cuentaEfectiva
+      ? supabase
+          .from('cuentas')
+          .select('id, nombre, saldo_actual')
+          .eq('usuario_id', user.id)
+          .eq('id', cuentaEfectiva)
+          .single()
+      : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from('cuentas')
+      .select('saldo_actual, tipo')
+      .eq('usuario_id', user.id)
+      .eq('activa', true)
+      .neq('tipo', 'inversion'),
+    supabase
+      .from('ingresos')
+      .select('monto_real, monto_esperado')
+      .eq('usuario_id', user.id)
+      .eq('estado', 'confirmado')
+      .is('cuenta_destino_id', null),
+  ])
+
+  const ingresosSinCuenta = (ingresosRes.data ?? []).reduce(
+    (sum, ingreso) => sum + Number(ingreso.monto_real ?? ingreso.monto_esperado ?? 0),
+    0
+  )
+  const saldoGlobalActualizado =
+    (cuentasRes.data ?? []).reduce((sum, cuenta) => sum + Number(cuenta.saldo_actual ?? 0), 0) +
+    ingresosSinCuenta
 
   revalidatePath('/gastos')
   revalidatePath('/')
   return {
-    previstosCoincidentes: (previstos ?? []).map((p) => ({
+    previstosCoincidentes: (previstosRes.data ?? []).map((p) => ({
       id: p.id,
       nombre: p.nombre,
       monto_estimado: Number(p.monto_estimado ?? 0),
     })),
     transaccionId: nuevaTx?.id,
+    cuentaAfectada: cuentaAfectadaRes.data
+      ? {
+          id: cuentaAfectadaRes.data.id,
+          nombre: cuentaAfectadaRes.data.nombre,
+          saldoActualizado: Number(cuentaAfectadaRes.data.saldo_actual ?? 0),
+        }
+      : null,
+    saldoGlobalActualizado,
   }
 }
 

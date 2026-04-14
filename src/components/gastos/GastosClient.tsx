@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Receipt, ChevronLeft, ChevronRight, CheckCircle2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import GastoCard from '@/components/gastos/GastoCard'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
+import SaldoDisponibleCompacto from '@/components/gastos/SaldoDisponibleCompacto'
 import VincularPrevistoModal from '@/components/gastos/VincularPrevistoModal'
 import { formatMXN } from '@/lib/format'
 import {
@@ -72,6 +73,7 @@ const FORMA_PAGO_LABEL: Record<string, string> = {
 interface Props {
   transacciones: Transaccion[]
   cuentas: Cuenta[]
+  ingresosSinCuenta: number
   tarjetas: Tarjeta[]
   period: GastoPeriodKey
   payment: GastoPaymentKey
@@ -84,10 +86,16 @@ interface Props {
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 type Sugerencia = { previstos: PrevistoBasico[]; transaccionId: string }
+type ToastData = {
+  title: string
+  cuentaLinea?: string | null
+  globalLinea: string
+}
 
 export default function GastosClient({
   transacciones,
   cuentas,
+  ingresosSinCuenta,
   tarjetas,
   period,
   payment,
@@ -98,16 +106,36 @@ export default function GastosClient({
 }: Props) {
   const [formOpen, setFormOpen] = useState(false)
   const [sugerencia, setSugerencia] = useState<Sugerencia | null>(null)
+  const [toast, setToast] = useState<ToastData | null>(null)
   const [customFrom, setCustomFrom] = useState(from)
   const [customTo, setCustomTo] = useState(to)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  function handleSave(data: { previstosCoincidentes?: PrevistoBasico[]; transaccionId?: string }) {
+  useEffect(() => {
+    if (!toast) return
+    const timeout = window.setTimeout(() => setToast(null), 3200)
+    return () => window.clearTimeout(timeout)
+  }, [toast])
+
+  function handleSave(data: {
+    previstosCoincidentes?: PrevistoBasico[]
+    transaccionId?: string
+    cuentaAfectada?: { id: string; nombre: string; saldoActualizado: number } | null
+    saldoGlobalActualizado?: number | null
+  }) {
     if (data.previstosCoincidentes && data.previstosCoincidentes.length > 0 && data.transaccionId) {
       setSugerencia({ previstos: data.previstosCoincidentes, transaccionId: data.transaccionId })
     }
+    setToast({
+      title: 'Gasto registrado',
+      cuentaLinea: data.cuentaAfectada
+        ? `${data.cuentaAfectada.nombre}: ${formatMXN(data.cuentaAfectada.saldoActualizado)}`
+        : null,
+      globalLinea: `Disponible global: ${formatMXN(data.saldoGlobalActualizado ?? 0)}`,
+    })
+    router.refresh()
   }
 
   const currentMes = getCurrentMonthKey()
@@ -171,6 +199,33 @@ export default function GastosClient({
 
   return (
     <div className="flex flex-col gap-6">
+      {toast && (
+        <div className="fixed inset-x-4 bottom-24 z-50 md:bottom-6 md:left-auto md:right-6 md:w-[22rem]">
+          <div className="rounded-2xl border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{toast.title}</p>
+                {toast.cuentaLinea && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{toast.cuentaLinea}</p>
+                )}
+                <p className="mt-0.5 text-xs text-muted-foreground">{toast.globalLinea}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Cerrar notificación"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SaldoDisponibleCompacto cuentas={cuentas} ingresosSinCuenta={ingresosSinCuenta} />
+
       <div className="rounded-xl border bg-card px-4 py-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
