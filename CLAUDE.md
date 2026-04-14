@@ -103,7 +103,7 @@ src/
 │   │   ├── ProximosIngresos.tsx      — Ingresos esperados próximos
 │   │   ├── AconsejameButton.tsx      — Botón + panel inline que consume el stream de /api/aconsejame
 │   │   ├── ConfirmarIngresoButton.tsx— Se usa para confirmar ingresos proyectados/fantasma
-│   │   ├── DashboardShell.tsx        — Header sticky mobile + pull-to-refresh + lock screen
+│   │   ├── DashboardShell.tsx        — Header sticky mobile + pull-to-refresh solo en `/` + lock screen
 │   │   └── LogoutButton.tsx          — Client Component que llama signOut
 │   ├── compromisos/
 │   │   ├── CompromisoCard.tsx        — Card con recomendación calculada, botón "Marcar pagado"
@@ -112,7 +112,7 @@ src/
 │   │   ├── PagarModal.tsx            — Modal centrado con opciones rápidas + selector de cuenta
 │   │   └── RecomendacionBadge.tsx    — Muestra el resultado de getRecomendacion() con color
 │   ├── gastos/
-│   │   ├── GastoCard.tsx             — Fila de transacción con icono por categoría + etiquetas legibles
+│   │   ├── GastoCard.tsx             — Card responsiva con chips de metadata; swipe edit/delete en móvil
 │   │   ├── GastosClient.tsx          — Client Component: filtros por periodo/pago, KPIs, agrupación por fecha, abre form
 │   │   └── RegistrarGastoForm.tsx    — Sheet para registrar gasto rápido + subcategoria/momento_del_dia
 │   ├── ingresos/
@@ -705,8 +705,7 @@ Sin tests automatizados ni Storybook. El flujo de verificación es: `tsc --noEmi
 ### Media prioridad
 
 - **Actualizar saldo de tarjetas al gastar** — al registrar un gasto con `credito_revolvente` o `msi`, se crea la transacción pero `tarjetas.saldo_actual` no se modifica. Solo se actualiza `cuentas.saldo_actual` cuando la forma de pago es débito/efectivo.
-- **Eliminar / editar transacciones** — en `/gastos` no hay botón de editar ni eliminar un registro ya creado.
-- **Filtros en /gastos** — solo muestra el mes actual; falta filtro por período, categoría, subcategoría y etiqueta.
+- **Filtros avanzados en /gastos** — ya existen filtros por periodo y forma de pago; aún faltan, si se desean, categoría, subcategoría y etiqueta.
 - **Análisis de gastos hormiga** — agregar panel en `/gastos` o `/presupuesto` con desglose por subcategoría y comparativa mes anterior.
 - **Forzar/ajustar lock de inactividad** — hoy el timeout está en 5 minutos reales; falta si se desea una opción visible de “Bloquear ahora” o configuración del tiempo.
 
