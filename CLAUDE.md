@@ -167,6 +167,9 @@ src/
 ## Decisiones recientes de UX y producto
 
 - En `/gastos`, el saldo disponible es contexto secundario: debe mostrarse en una variante compacta y expandible por cuenta, no como un hero card equivalente al dashboard.
+- En `/gastos`, el chip `Rango` solo abre el editor de fechas; la URL y el filtro se actualizan hasta que el usuario pulsa `Aplicar rango`.
+- En `/gastos`, cada grupo de transacciones por fecha debe mostrar un acumulado diario sutil a la derecha del encabezado.
+- En móvil, `/gastos` debe estar optimizado para que las transacciones aparezcan antes: menos margen superior/lateral, filtros/KPIs más compactos y chips horizontales con scroll oculto.
 - Después de registrar un gasto, la UX esperada es: toast breve de éxito con saldos actualizados + `refresh` local de la pantalla actual.
 - El dashboard debe mostrar el total vencido dentro del card `Compromisos vencidos a hoy`, debajo del título.
 - En `Pagos fijos`, nuevas altas permitidas: `fijo`, `prestamo`, `suscripcion`.
