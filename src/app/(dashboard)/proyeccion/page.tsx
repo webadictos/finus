@@ -1,13 +1,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ProyeccionClient from '@/components/proyeccion/ProyeccionClient'
+import { getProjectedRecurringIngresos } from '@/lib/ingresos'
 
-export default async function ProyeccionPage() {
+interface Props {
+  searchParams: Promise<{ tab?: string }>
+}
+
+export default async function ProyeccionPage({ searchParams }: Props) {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { tab } = await searchParams
+  const activeTab = tab === 'gastos' ? 'gastos' : 'resumen'
 
   const [cuentasRes, ingresosRes, compromisosRes, gastosRes] = await Promise.all([
     supabase
@@ -20,7 +27,6 @@ export default async function ProyeccionPage() {
       .from('ingresos')
       .select('*')
       .eq('usuario_id', user.id)
-      .eq('estado', 'esperado')
       .order('fecha_esperada', { ascending: true }),
     supabase
       .from('compromisos')
@@ -40,6 +46,15 @@ export default async function ProyeccionPage() {
     (sum, c) => sum + Number(c.saldo_actual ?? 0),
     0
   )
+  const ingresos = ingresosRes.data ?? []
+  const ingresosProyectados = [
+    ...ingresos.filter((ingreso) => ingreso.estado === 'esperado'),
+    ...getProjectedRecurringIngresos(ingresos, 45),
+  ].sort((a, b) => {
+    const fechaA = a.fecha_esperada ?? a.fecha_real ?? '9999-12-31'
+    const fechaB = b.fecha_esperada ?? b.fecha_real ?? '9999-12-31'
+    return fechaA.localeCompare(fechaB)
+  })
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -53,9 +68,10 @@ export default async function ProyeccionPage() {
       <ProyeccionClient
         saldoActual={saldoActual}
         cuentas={cuentasRes.data ?? []}
-        ingresos={ingresosRes.data ?? []}
+        ingresos={ingresosProyectados}
         compromisos={compromisosRes.data ?? []}
         gastosPrevistos={gastosRes.data ?? []}
+        activeTab={activeTab}
       />
     </div>
   )

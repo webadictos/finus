@@ -270,30 +270,46 @@ export function getProjectedRecurringIngresos(
     const baseFecha = getIngresoRecurrenceBaseDate(ingreso)
     if (!baseFecha || !ingreso.frecuencia) continue
 
-    const siguienteFecha = calcularSiguienteFechaIngreso(
-      baseFecha,
-      ingreso.frecuencia,
-      ingreso.dia_del_mes
+    const fechasExistentes = new Set(
+      ingresosNoConfirmados
+        .filter((candidate) => candidate.nombre === ingreso.nombre)
+        .map((candidate) => candidate.fecha_esperada)
+        .filter((fecha): fecha is string => Boolean(fecha))
     )
 
-    if (siguienteFecha < toISODate(hoy) || siguienteFecha > limiteIso) continue
+    let cursorFecha = baseFecha
+    let sequence = 1
 
-    const yaExiste = ingresosNoConfirmados.some(
-      (candidate) =>
-        candidate.nombre === ingreso.nombre &&
-        candidate.fecha_esperada === siguienteFecha
-    )
+    while (true) {
+      const siguienteFecha = calcularSiguienteFechaIngreso(
+        cursorFecha,
+        ingreso.frecuencia,
+        ingreso.dia_del_mes
+      )
 
-    if (yaExiste) continue
+      if (siguienteFecha > limiteIso) break
 
-    projected.push({
-      ...ingreso,
-      id: `${ingreso.id}_next`,
-      fecha_esperada: siguienteFecha,
-      fecha_real: null,
-      monto_real: null,
-      estado: 'esperado',
-    })
+      cursorFecha = siguienteFecha
+
+      if (siguienteFecha < toISODate(hoy)) {
+        continue
+      }
+
+      if (fechasExistentes.has(siguienteFecha)) {
+        continue
+      }
+
+      fechasExistentes.add(siguienteFecha)
+      projected.push({
+        ...ingreso,
+        id: `${ingreso.id}_next_${sequence}`,
+        fecha_esperada: siguienteFecha,
+        fecha_real: null,
+        monto_real: null,
+        estado: 'esperado',
+      })
+      sequence += 1
+    }
   }
 
   return projected
