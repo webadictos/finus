@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus, TrendingUp, TrendingDown, ArrowDown, ArrowUp, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Badge from '@/components/shared/Badge'
@@ -19,6 +20,7 @@ type Cuenta = Database['public']['Tables']['cuentas']['Row']
 
 const HORIZONTES = [7, 15, 30, 45] as const
 type Horizonte = (typeof HORIZONTES)[number]
+type ProyeccionTab = 'resumen' | 'gastos'
 
 const PROB_FACTOR: Record<string, number> = { alta: 0.9, media: 0.5, baja: 0.2 }
 const CERTEZA_FACTOR: Record<string, number> = { alta: 1.0, media: 0.7, baja: 0.4 }
@@ -58,11 +60,34 @@ function fechaEnPeriodo(fecha: string | null, limitDate: Date): boolean {
   return f >= hoy && f <= limitDate
 }
 
+function fechaVencida(fecha: string | null): boolean {
+  if (!fecha) return false
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const f = new Date(fecha + 'T12:00:00')
+  return f < hoy
+}
+
 function calcularLimite(dias: number): Date {
   const d = new Date()
   d.setDate(d.getDate() + dias)
   d.setHours(23, 59, 59, 999)
   return d
+}
+
+function getCompromisoMonto(c: Compromiso): number {
+  switch (c.tipo_pago) {
+    case 'revolvente':
+      return Number(c.pago_minimo ?? c.pago_sin_intereses ?? 0)
+    case 'msi':
+      return Number(c.monto_mensualidad ?? c.pago_sin_intereses ?? c.pago_minimo ?? 0)
+    case 'prestamo':
+    case 'fijo':
+    case 'disposicion_efectivo':
+      return Number(c.monto_mensualidad ?? c.pago_minimo ?? 0)
+    default:
+      return Number(c.monto_mensualidad ?? c.pago_minimo ?? c.pago_sin_intereses ?? 0)
+  }
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -73,6 +98,7 @@ interface Props {
   ingresos: Ingreso[]
   compromisos: Compromiso[]
   gastosPrevistos: GastoPrevisto[]
+  activeTab: ProyeccionTab
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -83,7 +109,11 @@ export default function ProyeccionClient({
   ingresos,
   compromisos,
   gastosPrevistos,
+  activeTab,
 }: Props) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [horizonte, setHorizonte] = useState<Horizonte>(30)
   const [formOpen, setFormOpen] = useState(false)
 
@@ -94,7 +124,10 @@ export default function ProyeccionClient({
     fechaEnPeriodo(i.fecha_esperada, limite)
   )
   const compromisosEnPeriodo = compromisos.filter((c) =>
-    fechaEnPeriodo(c.fecha_proximo_pago, limite)
+    fechaEnPeriodo(c.fecha_proximo_pago, limite) || fechaVencida(c.fecha_proximo_pago)
+  )
+  const compromisosVencidos = compromisosEnPeriodo.filter((c) =>
+    fechaVencida(c.fecha_proximo_pago)
   )
   const gastosEnPeriodo = gastosPrevistos.filter((g) => {
     if (g.realizado) return false
@@ -115,7 +148,7 @@ export default function ProyeccionClient({
     0
   )
   const totalCompromisos = compromisosEnPeriodo.reduce(
-    (sum, c) => sum + Number(c.monto_mensualidad ?? 0),
+    (sum, c) => sum + getCompromisoMonto(c),
     0
   )
   const totalGastos = gastosEnPeriodo.reduce(
@@ -125,8 +158,48 @@ export default function ProyeccionClient({
   const saldoProyectado = saldoActual + totalIngresos - totalCompromisos - totalGastos
   const positivo = saldoProyectado >= 0
 
+  const handleTabChange = (nextTab: ProyeccionTab) => {
+    if (nextTab === activeTab) return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', nextTab)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex border-b border-border -mb-2">
+        {([
+          { id: 'resumen', label: 'Resumen' },
+          { id: 'gastos', label: 'Gastos previstos' },
+        ] as const).map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => handleTabChange(id)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === id
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {label}
+            {id === 'gastos' && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-xs tabular-nums ${
+                  activeTab === id
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {gastosPrevistos.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'resumen' ? (
+        <>
       {/* Selector de horizonte */}
       <div className="flex items-center gap-2">
         {HORIZONTES.map((h) => (
@@ -253,6 +326,11 @@ export default function ProyeccionClient({
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
             Compromisos pendientes ({compromisosEnPeriodo.length})
           </h2>
+          {compromisosVencidos.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Incluye {compromisosVencidos.length} vencido{compromisosVencidos.length === 1 ? '' : 's'} o en mora
+            </p>
+          )}
           {compromisosEnPeriodo.length === 0 ? (
             <p className="rounded-xl border border-dashed bg-card px-4 py-6 text-center text-sm text-muted-foreground">
               Sin compromisos en este período
@@ -260,7 +338,7 @@ export default function ProyeccionClient({
           ) : (
             <div className="flex flex-col gap-2">
               {compromisosEnPeriodo.map((c) => {
-                const monto = Number(c.monto_mensualidad ?? 0)
+                const monto = getCompromisoMonto(c)
                 const dias = c.fecha_proximo_pago
                   ? diasHastaFecha(c.fecha_proximo_pago)
                   : null
@@ -275,6 +353,11 @@ export default function ProyeccionClient({
                         <Badge variant="default" className="text-[10px]">
                           {TIPO_PAGO_LABEL[c.tipo_pago] ?? c.tipo_pago}
                         </Badge>
+                        {fechaVencida(c.fecha_proximo_pago) && (
+                          <Badge variant="error" className="text-[10px]">
+                            Vencido
+                          </Badge>
+                        )}
                         {c.fecha_proximo_pago && (
                           <span className="text-xs text-muted-foreground">
                             {formatFecha(c.fecha_proximo_pago)}
@@ -293,34 +376,36 @@ export default function ProyeccionClient({
           )}
         </div>
       </div>
+        </>
+      ) : (
+        /* Gastos previstos */
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Gastos previstos ({gastosPrevistos.length})
+            </h2>
+            <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
+              <Plus className="size-3.5" />
+              Nuevo gasto previsto
+            </Button>
+          </div>
 
-      {/* Gastos previstos */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Gastos previstos ({gastosPrevistos.length})
-          </h2>
-          <Button size="sm" variant="outline" onClick={() => setFormOpen(true)}>
-            <Plus className="size-3.5" />
-            Nuevo gasto previsto
-          </Button>
+          {gastosPrevistos.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
+              <p className="text-sm font-medium">Sin gastos previstos</p>
+              <p className="text-xs text-muted-foreground">
+                Agrega gastos que sabes que van a ocurrir aunque no tengan fecha exacta
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {gastosPrevistos.map((g) => (
+                <GastoPrevistoCard key={g.id} gasto={g} cuentas={cuentas} />
+              ))}
+            </div>
+          )}
         </div>
-
-        {gastosPrevistos.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed bg-card px-6 py-10 text-center">
-            <p className="text-sm font-medium">Sin gastos previstos</p>
-            <p className="text-xs text-muted-foreground">
-              Agrega gastos que sabes que van a ocurrir aunque no tengan fecha exacta
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {gastosPrevistos.map((g) => (
-              <GastoPrevistoCard key={g.id} gasto={g} cuentas={cuentas} />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       <GastoPrevistoForm open={formOpen} onOpenChange={setFormOpen} />
     </div>
