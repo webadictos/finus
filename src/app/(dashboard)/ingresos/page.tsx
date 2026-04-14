@@ -79,7 +79,7 @@ export default async function IngresosPage({ searchParams }: Props) {
     .reduce((sum, i) => sum + Number(i.monto_esperado ?? 0), 0)
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

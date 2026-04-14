@@ -35,7 +35,7 @@ export default async function CuentasPage() {
   const tieneEfectivo = cuentas.some((c) => c.tipo === 'efectivo')
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

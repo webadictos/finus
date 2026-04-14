@@ -118,7 +118,7 @@ export default async function CompromisosPage({
   const activeTab = tab === 'pagos' || tab === 'prestamos' ? tab : 'lineas'
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl mx-auto">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold">Compromisos</h1>

@@ -152,7 +152,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const currentPeriod = normalizeDashboardPeriod(period)
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto">
+    <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-xl font-bold">Dashboard</h1>
         <p className="hidden md:block text-sm text-muted-foreground">Tu flujo de efectivo de un vistazo</p>
