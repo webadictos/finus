@@ -1,5 +1,12 @@
 import type { Database } from '@/types/database'
-import { formatISODateLocal, getTodayLocalISO, parseISODateLocal } from '@/lib/local-date'
+import {
+  addDaysToISODate,
+  formatISODateLocal,
+  getEndOfMonthISO,
+  getStartOfMonthISO,
+  getTodayLocalISO,
+  parseISODateLocal,
+} from '@/lib/local-date'
 
 type Ingreso = Database['public']['Tables']['ingresos']['Row']
 
@@ -30,51 +37,23 @@ export const INGRESO_PERIOD_OPTIONS: Array<{
   { key: 'all', label: 'Todo' },
 ]
 
-function normalizeDate(date: Date): Date {
-  const next = new Date(date)
-  next.setHours(0, 0, 0, 0)
-  return next
-}
-
-function toISODate(date: Date): string {
-  return formatISODateLocal(normalizeDate(date))
-}
-
 function getLastDayOfMonth(year: number, monthIndex: number): number {
   return new Date(year, monthIndex + 1, 0).getDate()
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function getStartOfWeek(date: Date): Date {
-  const next = normalizeDate(date)
-  const day = next.getDay()
+function getStartOfWeekISO(todayIso: string): string {
+  const day = parseISODateLocal(todayIso).getDay()
   const diff = day === 0 ? -6 : 1 - day
-  next.setDate(next.getDate() + diff)
-  return next
+  return addDaysToISODate(todayIso, diff)
 }
 
-function getEndOfWeek(date: Date): Date {
-  return addDays(getStartOfWeek(date), 6)
-}
-
-function getStartOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function getEndOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0)
-}
-
-function getProjectionHorizonDays(end: Date | null, today: Date): number {
+function getProjectionHorizonDays(end: string | null, today: string): number {
   if (!end) return 30
 
   const msInDay = 1000 * 60 * 60 * 24
-  const diff = Math.floor((normalizeDate(end).getTime() - normalizeDate(today).getTime()) / msInDay)
+  const diff = Math.floor(
+    (parseISODateLocal(end).getTime() - parseISODateLocal(today).getTime()) / msInDay
+  )
   return Math.max(diff, 0)
 }
 
@@ -88,25 +67,25 @@ export function getIngresoPeriodMeta(
   period: IngresoPeriodKey,
   today = new Date()
 ): PeriodMeta {
-  const currentDate = normalizeDate(today)
+  const todayIso = getTodayLocalISO(today)
 
   switch (period) {
     case 'week': {
-      const start = getStartOfWeek(currentDate)
-      const end = getEndOfWeek(currentDate)
+      const start = getStartOfWeekISO(todayIso)
+      const end = addDaysToISODate(start, 6)
       return {
         key: period,
         label: 'Esta semana',
         kpiScope: 'en la semana',
         sectionScope: 'de la semana',
         emptyScope: 'esta semana',
-        projectionHorizonDays: getProjectionHorizonDays(end, currentDate),
-        start: toISODate(start),
-        end: toISODate(end),
+        projectionHorizonDays: getProjectionHorizonDays(end, todayIso),
+        start,
+        end,
       }
     }
     case 'next30': {
-      const end = addDays(currentDate, 29)
+      const end = addDaysToISODate(todayIso, 29)
       return {
         key: period,
         label: 'Proximos 30 dias',
@@ -114,12 +93,12 @@ export function getIngresoPeriodMeta(
         sectionScope: 'en 30 dias',
         emptyScope: 'los proximos 30 dias',
         projectionHorizonDays: 29,
-        start: toISODate(currentDate),
-        end: toISODate(end),
+        start: todayIso,
+        end,
       }
     }
     case 'next45': {
-      const end = addDays(currentDate, 44)
+      const end = addDaysToISODate(todayIso, 44)
       return {
         key: period,
         label: 'Proximos 45 dias',
@@ -127,8 +106,8 @@ export function getIngresoPeriodMeta(
         sectionScope: 'en 45 dias',
         emptyScope: 'los proximos 45 dias',
         projectionHorizonDays: 44,
-        start: toISODate(currentDate),
-        end: toISODate(end),
+        start: todayIso,
+        end,
       }
     }
     case 'all':
@@ -144,17 +123,17 @@ export function getIngresoPeriodMeta(
       }
     case 'month':
     default: {
-      const start = getStartOfMonth(currentDate)
-      const end = getEndOfMonth(currentDate)
+      const start = getStartOfMonthISO(today)
+      const end = getEndOfMonthISO(today)
       return {
         key: 'month',
         label: 'Mes actual',
         kpiScope: 'en el mes',
         sectionScope: 'del mes',
         emptyScope: 'este mes',
-        projectionHorizonDays: getProjectionHorizonDays(end, currentDate),
-        start: toISODate(start),
-        end: toISODate(end),
+        projectionHorizonDays: getProjectionHorizonDays(end, todayIso),
+        start,
+        end,
       }
     }
   }
@@ -243,11 +222,12 @@ export function getProjectedRecurringIngresos(
   ingresos: Ingreso[],
   horizonDays = 30
 ): Ingreso[] {
-  const hoy = parseISODateLocal(getTodayLocalISO())
+  const todayIso = getTodayLocalISO()
+  const hoy = parseISODateLocal(todayIso)
 
   const limite = new Date(hoy)
   limite.setDate(limite.getDate() + horizonDays)
-  const limiteIso = toISODate(limite)
+  const limiteIso = formatISODateLocal(limite)
 
   const ultimoPorNombre = new Map<string, Ingreso>()
 
@@ -291,7 +271,7 @@ export function getProjectedRecurringIngresos(
 
       cursorFecha = siguienteFecha
 
-      if (siguienteFecha < toISODate(hoy)) {
+      if (siguienteFecha < todayIso) {
         continue
       }
 
