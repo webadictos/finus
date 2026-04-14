@@ -107,7 +107,7 @@ export default async function GastosPage({ searchParams }: Props) {
   )
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
+    <div className="flex flex-col gap-4 px-3 pb-4 pt-0 md:gap-6 md:p-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Gastos</h1>
         <p className="hidden md:block text-sm text-muted-foreground mt-0.5">
