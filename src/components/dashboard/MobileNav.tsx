@@ -15,6 +15,7 @@ import {
   BarChart3,
   Target,
   Settings,
+  ShieldCheck,
   X,
 } from 'lucide-react'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
@@ -33,6 +34,7 @@ const MAS_ITEMS = [
   { href: '/ingresos', label: 'Ingresos', icon: TrendingUp },
   { href: '/cuentas', label: 'Cuentas', icon: Landmark },
   { href: '/proyeccion', label: 'Proyección', icon: BarChart3 },
+  { href: '/presupuesto', label: 'Presupuesto', icon: ShieldCheck },
   { href: '/metas', label: 'Metas', icon: Target },
   { href: '/configuracion', label: 'Config.', icon: Settings },
 ]
@@ -163,6 +165,19 @@ export default function MobileNav({ cuentas, tarjetas }: Props) {
                 <div>
                   <p className="text-sm font-semibold">Transferir</p>
                   <p className="text-xs text-muted-foreground">Mover dinero entre cuentas</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => { setQuickOpen(false); router.push('/compromisos?tab=pagos') }}
+                className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3.5 text-left hover:bg-muted transition-colors"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <CreditCard className="size-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Agregar pago fijo</p>
+                  <p className="text-xs text-muted-foreground">Registrar préstamo o servicio fijo</p>
                 </div>
               </button>
             </div>

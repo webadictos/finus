@@ -29,7 +29,7 @@ export default function DashboardPeriodFilter({ period }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Horizonte del dashboard
+        Periodo
       </p>
       <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {DASHBOARD_PERIOD_OPTIONS.map((option) => {

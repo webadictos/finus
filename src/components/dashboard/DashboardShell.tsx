@@ -139,7 +139,7 @@ export default function DashboardShell({
         <header className="sticky top-0 z-30 border-b bg-card/95 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur md:hidden">
           <div className="flex items-center justify-between">
             <Link href="/">
-              <img src="/finus-logo.svg" height={36} alt="Finus" style={{ height: 36 }} />
+              <img src="/finus.svg" height={32} alt="Finus" style={{ height: 32 }} />
             </Link>
             <Link
               href="/configuracion"
