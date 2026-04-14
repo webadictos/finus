@@ -152,7 +152,7 @@ export default function DashboardShell({
 
         <main
           ref={mainRef}
-          className="relative flex-1 overflow-auto overscroll-y-contain p-4 pb-20 md:p-6 md:pb-6"
+          className="relative flex-1 overflow-y-auto overscroll-y-contain p-4 pb-20 md:overflow-visible md:overscroll-auto md:p-6 md:pb-6"
         >
           <div className="pointer-events-none sticky top-3 z-20 flex justify-center md:hidden">
             <div
@@ -169,7 +169,10 @@ export default function DashboardShell({
           <div
             className="transition-transform duration-200 ease-out"
             style={{
-              transform: `translateY(${showRefresh ? 20 : pullDistance}px)`,
+              transform:
+                showRefresh || pullDistance > 0
+                  ? `translateY(${showRefresh ? 20 : pullDistance}px)`
+                  : undefined,
             }}
           >
             {children}

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 // Rutas que no requieren autenticación
-const PUBLIC_ROUTES = ['/login', '/register']
+const PUBLIC_ROUTES = ['/login', '/register', '/api/webauthn/login']
 
 export async function proxy(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request)

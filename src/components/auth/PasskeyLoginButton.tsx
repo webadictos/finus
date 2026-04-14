@@ -7,7 +7,18 @@ import { Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 async function parseJson<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T & { error?: string }
+  const text = await response.text()
+  if (!text) {
+    throw new Error('La respuesta del servidor llegó vacía.')
+  }
+
+  let data: (T & { error?: string }) | null = null
+  try {
+    data = JSON.parse(text) as T & { error?: string }
+  } catch {
+    throw new Error('La respuesta del servidor no fue JSON válido.')
+  }
+
   if (!response.ok) {
     throw new Error(data.error || 'Ocurrió un error')
   }
@@ -59,6 +70,14 @@ export default function PasskeyLoginButton() {
         router.replace('/')
         router.refresh()
       } catch (loginError) {
+        if (
+          loginError instanceof Error &&
+          (loginError.name === 'AbortError' || loginError.name === 'NotAllowedError')
+        ) {
+          setError('Autenticación con passkey cancelada.')
+          return
+        }
+
         setError(
           loginError instanceof Error
             ? loginError.message
