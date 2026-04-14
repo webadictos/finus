@@ -12,6 +12,11 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: 'Finus — Planificación financiera inteligente',
   description: 'No te dice en qué gastaste. Te dice qué hacer con tu dinero.',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Finus',
+  },
 }
 
 export default function RootLayout({
@@ -30,7 +35,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#4F46E5" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Finus" />
         <link rel="apple-touch-icon" href="/finus-logo.svg" />
       </head>

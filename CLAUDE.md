@@ -25,6 +25,7 @@ tw-animate-css      ^1.4.0       — clases data-[state=open]:animate-in etc.
 @supabase/ssr       ^0.10.2      — cliente SSR con cookies
 @supabase/supabase-js ^2.103.0
 @anthropic-ai/sdk   ^0.88.0      — streaming con messages.stream()
+@simplewebauthn/browser / server — passkeys propias de Finus (registro, unlock y login)
 radix-ui            ^1.4.3       — paquete unificado (NO @radix-ui/react-* separados)
 @base-ui/react      ^1.3.0       — solo para Button
 class-variance-authority ^0.7.1
@@ -50,12 +51,12 @@ src/
 │   ├── globals.css                   — Variables CSS, @import tailwindcss
 │   ├── (auth)/
 │   │   ├── layout.tsx                — Layout mínimo sin sidebar
-│   │   ├── login/page.tsx            — Login con email/password
+│   │   ├── login/page.tsx            — Login con email/password + botón de passkey
 │   │   ├── register/page.tsx         — Registro
 │   │   └── actions.ts                — signIn, signUp, signOut server actions
 │   ├── (dashboard)/
-│   │   ├── layout.tsx                — Sidebar desktop + bottom nav mobile + auth check
-│   │   ├── page.tsx                  — Dashboard: SaldoHeader + KPICards + AconsejameButton + alertas
+│   │   ├── layout.tsx                — Sidebar desktop + DashboardShell mobile + auth check
+│   │   ├── page.tsx                  — Dashboard: saldo + KPIs + reserva operativa + alertas
 │   │   ├── actions.ts                — (acciones globales del dashboard si las hay)
 │   │   ├── compromisos/
 │   │   │   ├── page.tsx              — Server Component: fetch compromisos + cuentas + tarjetas
@@ -64,8 +65,11 @@ src/
 │   │   │   ├── page.tsx              — Server Component: fetch transacciones mes actual
 │   │   │   └── actions.ts            — registrarGasto → insert transacción + decrementar_saldo
 │   │   ├── ingresos/
-│   │   │   ├── page.tsx              — Server Component: fetch ingresos + cuentas
-│   │   │   └── actions.ts            — crearIngreso, actualizarIngreso, confirmarIngreso
+│   │   │   ├── page.tsx              — Server Component: fetch ingresos + cuentas + proyección recurrente
+│   │   │   └── actions.ts            — crearIngreso, actualizarIngreso, confirmarIngreso, phantom confirm
+│   │   ├── presupuesto/
+│   │   │   ├── page.tsx              — Vista de presupuesto operativo
+│   │   │   └── actions.ts            — CRUD + sugerencias para partidas operativas
 │   │   ├── proyeccion/
 │   │   │   ├── page.tsx              — Server Component: fetch saldo + ingresos + compromisos + gastos
 │   │   │   └── actions.ts            — crearGastoPrevisto, actualizarGastoPrevisto, confirmarFechaGasto
@@ -74,6 +78,11 @@ src/
 │   └── api/
 │       ├── aconsejame/
 │       │   └── route.ts              — POST: fetch datos usuario → prompt → stream Claude Haiku
+│       ├── webauthn/
+│       │   ├── credentials/route.ts  — Lista/elimina passkeys autenticadas del usuario
+│       │   ├── register/*            — Opciones y verificación de registro WebAuthn
+│       │   ├── authenticate/*        — Unlock/reautenticación dentro de sesión
+│       │   └── login/*               — Login completo con passkey + emisión de sesión Supabase
 │       └── supabase/
 │           ├── compromisos/route.ts  — PLACEHOLDER (TODO)
 │           └── ingresos/route.ts     — PLACEHOLDER (TODO)
@@ -89,11 +98,12 @@ src/
 │   │   └── ProgressBar.tsx           — Barra verde (value≥max) o roja
 │   ├── dashboard/
 │   │   ├── SaldoHeader.tsx           — Suma de cuentas líquidas + lista de cuentas
-│   │   ├── KPICards.tsx              — 4 KPIs: ingresos esperados, compromisos, gastos previstos, MSI
+│   │   ├── KPICards.tsx              — KPIs incluyendo reserva operativa
 │   │   ├── AlertasVencimiento.tsx    — Compromisos que vencen en 7 días con recomendación
 │   │   ├── ProximosIngresos.tsx      — Ingresos esperados próximos
 │   │   ├── AconsejameButton.tsx      — Botón + panel inline que consume el stream de /api/aconsejame
-│   │   ├── ConfirmarIngresoButton.tsx— (revisar si sigue en uso)
+│   │   ├── ConfirmarIngresoButton.tsx— Se usa para confirmar ingresos proyectados/fantasma
+│   │   ├── DashboardShell.tsx        — Header sticky mobile + pull-to-refresh + lock screen
 │   │   └── LogoutButton.tsx          — Client Component que llama signOut
 │   ├── compromisos/
 │   │   ├── CompromisoCard.tsx        — Card con recomendación calculada, botón "Marcar pagado"
@@ -102,14 +112,25 @@ src/
 │   │   ├── PagarModal.tsx            — Modal centrado con opciones rápidas + selector de cuenta
 │   │   └── RecomendacionBadge.tsx    — Muestra el resultado de getRecomendacion() con color
 │   ├── gastos/
-│   │   ├── GastoCard.tsx             — Fila de transacción con icono por categoría
+│   │   ├── GastoCard.tsx             — Fila de transacción con icono por categoría + etiquetas legibles
 │   │   ├── GastosClient.tsx          — Client Component: agrupa por fecha, KPIs, abre form
-│   │   └── RegistrarGastoForm.tsx    — Sheet para registrar gasto rápido
+│   │   └── RegistrarGastoForm.tsx    — Sheet para registrar gasto rápido + subcategoria/momento_del_dia
 │   ├── ingresos/
 │   │   ├── IngresoCard.tsx           — Card con estado, badges, botón "Confirmar recibido"
 │   │   ├── IngresoForm.tsx           — Sheet para crear/editar ingreso + cuenta_destino
 │   │   ├── NuevoIngresoButton.tsx    — Client Component que abre IngresoForm
 │   │   └── ConfirmarModal.tsx        — Modal para confirmar monto real + fecha
+│   ├── presupuesto/
+│   │   ├── PartidaCard.tsx           — Card de partida operativa
+│   │   ├── PartidaForm.tsx           — Form/modal accesible para crear/editar partidas
+│   │   └── PresupuestoClient.tsx     — KPIs, listado y flujo de sugerencias
+│   ├── configuracion/
+│   │   ├── ConfiguracionClient.tsx   — Perfil, seguridad, passkeys y reset
+│   │   └── PasskeysSection.tsx       — Registro/listado/eliminación de passkeys propias
+│   ├── auth/
+│   │   └── PasskeyLoginButton.tsx    — Botón de login completo con passkey en `/login`
+│   ├── security/
+│   │   └── IdleLockOverlay.tsx       — Bloqueo tras inactividad + unlock por passkey/contraseña
 │   └── proyeccion/
 │       ├── ProyeccionClient.tsx      — Client Component: selector horizonte (7/15/30/45d), saldo proyectado
 │       ├── GastoPrevistoCard.tsx     — Card con certeza, fecha, botón confirmar fecha
@@ -118,15 +139,20 @@ src/
 │
 ├── lib/
 │   ├── format.ts                     — formatMXN(), formatFecha(), diasHastaFecha()
+│   ├── ingresos.ts                   — Utilidades de recurrencia/proyección de ingresos
+│   ├── presupuesto.ts                — Reserva operativa y helpers de presupuesto operativo
 │   ├── recommendations.ts            — getRecomendacion(), getRecomendaciones() — lógica de pagos
+│   ├── tags.ts                       — Compatibilidad `label/slug` para etiquetas
 │   ├── utils.ts                      — cn() helper (clsx + tailwind-merge)
+│   ├── webauthn.ts                   — Tipos/helpers cliente para passkeys
+│   ├── webauthn-server.ts            — RP origin, cookies, generate/verify simplewebauthn
 │   └── supabase/
-│       ├── server.ts                 — createClient() para Server Components y Route Handlers
+│       ├── server.ts                 — createClient() + createAdminClient() con service role
 │       ├── client.ts                 — createBrowserClient() para Client Components
 │       └── middleware.ts             — updateSession() — refresca sesión en cada request
 │
 ├── types/
-│   ├── database.ts                   — Tipos del schema de Supabase (FUENTE DE VERDAD del DB)
+│   ├── database.ts                   — Tipos del schema de Supabase (incluye presupuesto, tags JSONB y webauthn_credentials)
 │   └── finus.ts                      — Interfaces de dominio (Recomendacion, CompromisoParaRecomendacion, etc.)
 │
 └── proxy.ts                          — Middleware de Next.js 16 (nombre "proxy", NO "middleware")
@@ -363,7 +389,7 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | categoria                     | text\|null  |                                                        |
 | **subcategoria**              | text\|null  | Ej: `restaurante \| cocina_propia \| antojo \| delivery` — ver sección Presupuesto Operativo |
 | **momento_del_dia**           | enum\|null  | `desayuno \| almuerzo \| cena \| snack \| sin_clasificar` — opcional, solo cuando aplica |
-| **etiquetas**                 | text[]\|null | Array de etiquetas libres definidas por el usuario    |
+| **etiquetas**                 | jsonb\|null  | Array de objetos `{ slug, label }`; el código mantiene compatibilidad con etiquetas legacy |
 | cuenta_id                     | uuid\|null  | FK → cuentas                                           |
 | tarjeta_id                    | uuid\|null  | FK → tarjetas                                          |
 | compromiso_id                 | uuid\|null  | FK → compromisos                                       |
@@ -394,7 +420,7 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | ------------------------ | ------------- | ------------------------------------------------------------------------------------------ |
 | id                       | uuid PK       |                                                                                            |
 | usuario_id               | uuid FK       |                                                                                            |
-| categoria                | text          | `comida \| gasolina \| despensa \| snacks \| transporte \| salud \| varios`               |
+| categoria                | text          | `comida \| gasolina \| despensa \| entretenimiento \| mascotas \| snacks \| transporte \| salud \| varios` |
 | subcategoria             | text\|null    | Refinamiento opcional: `restaurante`, `cocina_propia`, etc.                               |
 | frecuencia               | enum          | `diario \| semanal \| quincenal \| mensual`                                               |
 | **monto_manual**         | numeric\|null | Ingresado por el usuario — fuente inicial siempre                                         |
@@ -540,7 +566,7 @@ Los campos `subcategoria` y `momento_del_dia` en `transacciones` permiten análi
 **Reglas de captura en el form de gastos:**
 - `subcategoria` y `momento_del_dia` son **siempre opcionales** — nunca bloquear el guardado si no se llenan
 - Cuando `categoria = 'comida'`, el form muestra los campos opcionales de subcategoría y momento del día
-- El bot de Telegram puede inferir el momento por la hora del mensaje (antes de las 11am → desayuno, etc.)
+- Cuando `categoria = 'gasolina'`, el form muestra subcategoría opcional (`lleno`, `emergencia`)
 - Con el tiempo, Finus pre-sugiere la subcategoría más frecuente del usuario a esa hora del día
 
 **Análisis de gastos hormiga** (`src/lib/presupuesto.ts → detectarGastosHormiga()`):
@@ -568,6 +594,9 @@ El análisis es **descriptivo, nunca punitivo**. Finus presenta el número con c
 | Streaming para `/api/aconsejame`                     | Respuestas de Claude tardan 5-10s; streaming mejora UX notablemente                             |
 | `claude-haiku-4-5-20251001` para Aconséjame          | Rápido y económico para análisis prescriptivo; max_tokens: 1000                                 |
 | No actualizar saldo de tarjetas                      | La lógica de saldo de tarjetas es más compleja (ciclo de corte); se deja como trabajo pendiente |
+| Passkeys propias con `simplewebauthn`                | Supabase WebAuthn MFA no era confiable en este proyecto; se implementó registro/login/unlock propio |
+| Login con passkey emite sesión Supabase server-side  | El middleware ya depende de cookies Supabase; se reutiliza ese modelo con `service_role` + `verifyOtp` |
+| Header mobile `sticky`, no `fixed`                   | Mantiene logo visible sin pelear con safe areas, pull-to-refresh ni overlays                    |
 | `subcategoria` y `momento_del_dia` opcionales en transacciones | Nunca bloquear el registro de un gasto por campos de análisis; la captura granular es progresiva |
 | `presupuesto_operativo` arranca con datos manuales   | Sin historial en el día 0, el sistema no puede aprender; la captura manual es el bootstrap necesario |
 | RPC `calcular_reserva_operativa` en DB               | Permite al dashboard calcular la reserva en una sola llamada sin traer todas las partidas al cliente |
@@ -628,10 +657,12 @@ El tipo `Functions: { [_ in never]: ... }` bloqueaba todas las llamadas a `.rpc(
 # .env.local (está en .gitignore, nunca commitear)
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...   # requerido para login completo con passkey
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 El endpoint `/api/aconsejame` valida `ANTHROPIC_API_KEY` y retorna HTTP 500 con mensaje claro si no está configurada.
+Los endpoints `/api/webauthn/login/*` requieren `SUPABASE_SERVICE_ROLE_KEY` para resolver el usuario por `credential_id` y emitir la sesión Supabase.
 
 ---
 
@@ -644,7 +675,7 @@ cd finus-app
 npm install
 
 # 2. Configurar variables de entorno
-cp .env.example .env.local   # o crear desde cero con las 3 variables
+cp .env.example .env.local   # o crear desde cero con las 4 variables
 
 # 3. Correr dev server
 npm run dev
@@ -664,15 +695,15 @@ Sin tests automatizados ni Storybook. El flujo de verificación es: `tsc --noEmi
 
 - **Vista Metas** (`/metas`) — actualmente es un `<h1>Metas</h1>`. Necesita CRUD, barra de progreso hacia el objetivo, y conexión con cuentas de ahorro/inversión.
 - **Configuración de cuentas y tarjetas** — no hay UI para agregar/editar cuentas ni tarjetas. El usuario de prueba las tiene insertadas directamente en Supabase.
-- **Vista Presupuesto Operativo** (`/presupuesto`) — nueva vista. Ver sección "Presupuesto Operativo y Gastos Hormiga" para spec completo.
+- **Ajuste fino de passkey login en producción** — depende de `SUPABASE_SERVICE_ROLE_KEY` y de validar el flujo completo contra el proyecto real hospedado.
 
 ### Media prioridad
 
 - **Actualizar saldo de tarjetas al gastar** — al registrar un gasto con `credito_revolvente` o `msi`, se crea la transacción pero `tarjetas.saldo_actual` no se modifica. Solo se actualiza `cuentas.saldo_actual` cuando la forma de pago es débito/efectivo.
 - **Eliminar / editar transacciones** — en `/gastos` no hay botón de editar ni eliminar un registro ya creado.
 - **Filtros en /gastos** — solo muestra el mes actual; falta filtro por período, categoría, subcategoría y etiqueta.
-- **KPI de reserva operativa en dashboard** — mostrar cuánto está reservado para gastos básicos en los próximos 7 días junto al saldo disponible.
 - **Análisis de gastos hormiga** — agregar panel en `/gastos` o `/presupuesto` con desglose por subcategoría y comparativa mes anterior.
+- **Forzar/ajustar lock de inactividad** — hoy el timeout está en 5 minutos reales; falta si se desea una opción visible de “Bloquear ahora” o configuración del tiempo.
 
 ### Baja prioridad
 

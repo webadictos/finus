@@ -7,10 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
-import {
-  formatPasskeyName,
-  type WebAuthnCredentialRecord,
-} from '@/lib/webauthn'
+import { type WebAuthnCredentialRecord } from '@/lib/webauthn'
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000
 
@@ -230,9 +227,7 @@ export default function IdleLockOverlay({ email }: Props) {
             <div className="rounded-2xl border bg-muted/40 p-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="size-4 text-emerald-600" />
-                <p className="text-sm font-medium">
-                  Passkey disponible: {formatPasskeyName(credentials[0], 0)}
-                </p>
+                <p className="text-sm font-medium">Desbloqueo biométrico disponible</p>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
                 Usa Face ID, Touch ID o el PIN de tu dispositivo para volver a entrar.

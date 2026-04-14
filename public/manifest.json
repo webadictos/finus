@@ -3,7 +3,7 @@
   "short_name": "Finus",
   "description": "Planificación financiera inteligente",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#F8F9FB",
   "theme_color": "#4F46E5",
   "orientation": "portrait",
