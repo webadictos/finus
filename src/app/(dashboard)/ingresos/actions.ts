@@ -1,6 +1,10 @@
 'use server'
 
-import { calcularSiguienteFechaIngreso } from '@/lib/ingresos'
+import {
+  calcularSiguienteFechaIngreso,
+  getIngresoRecurrenceBaseDate,
+  resolveIngresoDiaDelMes,
+} from '@/lib/ingresos'
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
@@ -13,6 +17,27 @@ export type ConfirmarIngresoResult = {
 
 type Frecuencia = 'mensual' | 'quincenal' | 'semanal' | 'anual'
 
+function getRecurringIngresoPayload(formData: FormData) {
+  const esRecurrente = formData.get('es_recurrente') === 'true'
+  const frecuencia = (formData.get('frecuencia') as Frecuencia | null) || null
+  const fechaEsperada = (formData.get('fecha_esperada') as string) || null
+  const montoEsperado = parseFloat(formData.get('monto_esperado') as string) || null
+  const diaDelMes =
+    esRecurrente && frecuencia === 'mensual'
+      ? resolveIngresoDiaDelMes(fechaEsperada)
+      : null
+  const montoFijo = esRecurrente ? montoEsperado : null
+
+  return {
+    esRecurrente,
+    frecuencia,
+    fechaEsperada,
+    montoEsperado,
+    diaDelMes,
+    montoFijo,
+  }
+}
+
 export async function crearIngreso(formData: FormData): Promise<ActionResult> {
   const supabase = await createClient()
   const {
@@ -20,8 +45,14 @@ export async function crearIngreso(formData: FormData): Promise<ActionResult> {
   } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  const esRecurrente = formData.get('es_recurrente') === 'true'
-  const frecuencia = (formData.get('frecuencia') as Frecuencia | null) || null
+  const {
+    esRecurrente,
+    frecuencia,
+    fechaEsperada,
+    montoEsperado,
+    diaDelMes,
+    montoFijo,
+  } = getRecurringIngresoPayload(formData)
 
   const cuentaDestinoId = (formData.get('cuenta_destino_id') as string) || null
 
@@ -29,12 +60,14 @@ export async function crearIngreso(formData: FormData): Promise<ActionResult> {
     usuario_id: user.id,
     nombre: (formData.get('nombre') as string).trim(),
     tipo: formData.get('tipo') as 'fijo_recurrente' | 'proyecto_recurrente' | 'unico',
-    monto_esperado: parseFloat(formData.get('monto_esperado') as string) || null,
-    fecha_esperada: (formData.get('fecha_esperada') as string) || null,
+    monto_esperado: montoEsperado,
+    monto_fijo: montoFijo,
+    fecha_esperada: fechaEsperada,
     probabilidad: (formData.get('probabilidad') as 'alta' | 'media' | 'baja') || 'media',
     estado: 'esperado',
     es_recurrente: esRecurrente,
     frecuencia: esRecurrente ? frecuencia : null,
+    dia_del_mes: diaDelMes,
     cuenta_destino_id: cuentaDestinoId,
   })
 
@@ -65,8 +98,14 @@ export async function actualizarIngreso(
 
   if (fetchErr || !actual) return { error: 'Ingreso no encontrado' }
 
-  const esRecurrente = formData.get('es_recurrente') === 'true'
-  const frecuencia = (formData.get('frecuencia') as Frecuencia | null) || null
+  const {
+    esRecurrente,
+    frecuencia,
+    fechaEsperada,
+    montoEsperado,
+    diaDelMes,
+    montoFijo,
+  } = getRecurringIngresoPayload(formData)
   const nuevaCuentaId = (formData.get('cuenta_destino_id') as string) || null
 
   const { error } = await supabase
@@ -74,11 +113,13 @@ export async function actualizarIngreso(
     .update({
       nombre: (formData.get('nombre') as string).trim(),
       tipo: formData.get('tipo') as 'fijo_recurrente' | 'proyecto_recurrente' | 'unico',
-      monto_esperado: parseFloat(formData.get('monto_esperado') as string) || null,
-      fecha_esperada: (formData.get('fecha_esperada') as string) || null,
+      monto_esperado: montoEsperado,
+      monto_fijo: montoFijo,
+      fecha_esperada: fechaEsperada,
       probabilidad: (formData.get('probabilidad') as 'alta' | 'media' | 'baja') || 'media',
       es_recurrente: esRecurrente,
       frecuencia: esRecurrente ? frecuencia : null,
+      dia_del_mes: diaDelMes,
       cuenta_destino_id: nuevaCuentaId,
     })
     .eq('id', id)
@@ -184,10 +225,19 @@ export async function confirmarIngreso(
   // 4. Si es recurrente, generar la siguiente instancia
   let nextIngresoId: string | null = null
   if (ingreso.es_recurrente && ingreso.fecha_esperada && ingreso.frecuencia) {
-    const baseFecha = fechaReal || ingreso.fecha_esperada
+    const baseFecha = getIngresoRecurrenceBaseDate({
+      ...ingreso,
+      fecha_real: fechaReal,
+    })
+
+    if (!baseFecha) {
+      return { error: 'No se pudo calcular la siguiente fecha del ingreso recurrente' }
+    }
+
     const nextFecha = calcularSiguienteFechaIngreso(
       baseFecha,
-      ingreso.frecuencia as Frecuencia
+      ingreso.frecuencia as Frecuencia,
+      resolveIngresoDiaDelMes(ingreso.fecha_esperada, ingreso.dia_del_mes)
     )
 
     const { data: existente } = await supabase
@@ -210,7 +260,7 @@ export async function confirmarIngreso(
           tipo: ingreso.tipo,
           es_recurrente: true,
           frecuencia: ingreso.frecuencia,
-          dia_del_mes: ingreso.dia_del_mes,
+          dia_del_mes: resolveIngresoDiaDelMes(ingreso.fecha_esperada, ingreso.dia_del_mes),
           monto_fijo: ingreso.monto_fijo,
           monto_esperado: ingreso.monto_fijo ?? ingreso.monto_esperado,
           fecha_esperada: nextFecha,
