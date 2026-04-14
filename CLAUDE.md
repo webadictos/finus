@@ -164,6 +164,15 @@ src/
 
 ## Convenciones del proyecto
 
+## Decisiones recientes de UX y producto
+
+- En `/gastos`, el saldo disponible es contexto secundario: debe mostrarse en una variante compacta y expandible por cuenta, no como un hero card equivalente al dashboard.
+- Después de registrar un gasto, la UX esperada es: toast breve de éxito con saldos actualizados + `refresh` local de la pantalla actual.
+- El dashboard debe mostrar el total vencido dentro del card `Compromisos vencidos a hoy`, debajo del título.
+- En `Pagos fijos`, nuevas altas permitidas: `fijo`, `prestamo`, `suscripcion`.
+- Los compromisos legacy `revolvente`, `msi` y `disposicion_efectivo` siguen siendo compatibles para lectura/visualización si ya existen, pero ya no deben darse de alta desde el flujo general de `Nuevo pago fijo`.
+- El formateo monetario debe conservar centavos reales; evitar redondeo agresivo a enteros en saldos y montos visibles.
+
 ### Server vs Client Components
 
 ```
