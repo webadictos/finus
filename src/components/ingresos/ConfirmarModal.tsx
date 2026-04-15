@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { confirmarIngreso, confirmarIngresoPhantom } from '@/app/(dashboard)/ingresos/actions'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { formatMXN } from '@/lib/format'
+import { parseIngresoPhantomId } from '@/lib/ingreso-phantom'
 import { getTodayLocalISO } from '@/lib/local-date'
 import type { Database } from '@/types/database'
 
@@ -49,8 +50,7 @@ export default function ConfirmarModal({
   fechaEsperada,
   onSuccess,
 }: Props) {
-  const isPhantom = ingresoId.endsWith('_next')
-  const originalId = isPhantom ? ingresoId.slice(0, -5) : ingresoId
+  const { isPhantom, originalId } = parseIngresoPhantomId(ingresoId)
   const today: string = getTodayLocalISO()
   const [monto, setMonto] = useState(String(montoEsperado))
   const [fecha, setFecha] = useState(today)
