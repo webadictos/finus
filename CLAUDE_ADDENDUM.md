@@ -239,6 +239,7 @@ Agregar a **Alta prioridad:**
 - **Editar y eliminar gastos** — con reversión de saldo al eliminar
 - **Editar y eliminar compromisos** — con modal de alcance para recurrentes
 - **Fix `incrementar_saldo` en `confirmarIngreso`** — garantizar que siempre se ejecute al confirmar un ingreso con cuenta_destino_id
+- **Fix confirmación de ingresos recurrentes projected/phantom** — los IDs UI `${id}_next_${n}` no existen en DB; resolver siempre al `originalId` antes de llamar `confirmarIngreso`
 
 Agregar a **Media prioridad:**
 - **Acuerdos de pago** — tabla `acuerdos_pago` + UI para préstamos en mora renegociados. Requiere migración SQL
@@ -428,4 +429,3 @@ Un gasto previsto realizado siempre tiene una transacción en gastos asociada. N
 - En `gastos_previstos` agregar columna `transaccion_id uuid FK → transacciones` para mantener el vínculo
 - En `confirmarGastoPrevisto` action → insert en transacciones + update gastos_previstos con transaccion_id y realizado = true
 - En `registrarGasto` action → buscar coincidencias en gastos_previstos y ofrecer vinculación
-

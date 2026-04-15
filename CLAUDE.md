@@ -141,6 +141,7 @@ src/
 │   ├── format.ts                     — formatMXN(), formatFecha(), diasHastaFecha()
 │   ├── local-date.ts                 — Helpers de fecha local (`YYYY-MM-DD`) sin corrimiento por UTC
 │   ├── gastos-filters.ts             — Periodos y filtros de forma de pago para `/gastos`
+│   ├── ingreso-phantom.ts            — Parseo de IDs sintéticos `_next` / `_next_n` para ingresos proyectados
 │   ├── ingresos.ts                   — Utilidades de recurrencia/proyección de ingresos
 │   ├── presupuesto.ts                — Reserva operativa y helpers de presupuesto operativo
 │   ├── recommendations.ts            — getRecomendacion(), getRecomendaciones() — lógica de pagos
@@ -226,6 +227,7 @@ Estas RPCs tienen `security definer` y actualizan `updated_at` automáticamente.
 
 - `decrementar_saldo` → `registrarGasto` (si forma_pago es efectivo/débito) y `marcarPagado` (si se selecciona cuenta)
 - `incrementar_saldo` → `confirmarIngreso` (si el ingreso tiene `cuenta_destino_id`)
+- Los ingresos recurrentes proyectados generan IDs sintéticos con formato `${id}_next_${n}`; esos IDs solo existen en UI y deben resolverse al `originalId` antes de confirmar
 
 ### Tipos
 
