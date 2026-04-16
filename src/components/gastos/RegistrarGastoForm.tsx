@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { registrarGasto, actualizarGasto } from '@/app/(dashboard)/gastos/actions'
 import MontoInput from '@/components/ui/MontoInput'
 import TagInput from '@/components/ui/TagInput'
+import { GASTO_CATEGORIA_OPTIONS } from '@/lib/gasto-categorias'
 import { getTodayLocalISO } from '@/lib/local-date'
 import { parseTags, type TagItem } from '@/lib/tags'
 import type { PrevistoBasico } from '@/app/(dashboard)/gastos/actions'
@@ -17,21 +18,6 @@ import type { Database } from '@/types/database'
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
 type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
-
-const CATEGORIA_OPTIONS = [
-  { value: 'comida', label: 'Comida' },
-  { value: 'gasolina', label: 'Gasolina' },
-  { value: 'despensa', label: 'Despensa' },
-  { value: 'casa', label: 'Casa' },
-  { value: 'salud', label: 'Salud' },
-  { value: 'escuela', label: 'Escuela' },
-  { value: 'entretenimiento', label: 'Entretenimiento' },
-  { value: 'mascota', label: 'Mascota' },
-  { value: 'ropa', label: 'Ropa' },
-  { value: 'imprevisto', label: 'Imprevisto' },
-  { value: 'varios_efectivo', label: 'Varios efectivo' },
-  { value: 'otro', label: 'Otro' },
-]
 
 const FORMA_PAGO_OPTIONS = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -331,7 +317,7 @@ export default function RegistrarGastoForm({ open, onOpenChange, cuentas, tarjet
                   onChange={handleCategoriaChange}
                   className={selectClass}
                 >
-                  {CATEGORIA_OPTIONS.map((o) => (
+                  {GASTO_CATEGORIA_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>

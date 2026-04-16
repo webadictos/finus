@@ -22,6 +22,7 @@ import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import ConfirmarAccionModal from '@/components/shared/ConfirmarAccionModal'
 import { eliminarGasto } from '@/app/(dashboard)/gastos/actions'
 import { formatFecha, formatMXN } from '@/lib/format'
+import { getGastoCategoriaLabel } from '@/lib/gasto-categorias'
 import { parseTags, type TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
@@ -42,21 +43,6 @@ const CATEGORIA_ICONS: Record<string, LucideIcon> = {
   imprevisto: AlertTriangle,
   varios_efectivo: Wallet,
   otro: Tag,
-}
-
-const CATEGORIA_LABEL: Record<string, string> = {
-  comida: 'Comida',
-  gasolina: 'Gasolina',
-  despensa: 'Despensa',
-  casa: 'Casa',
-  salud: 'Salud',
-  escuela: 'Escuela',
-  entretenimiento: 'Entretenimiento',
-  mascota: 'Mascota',
-  ropa: 'Ropa',
-  imprevisto: 'Imprevisto',
-  varios_efectivo: 'Varios efectivo',
-  otro: 'Otro',
 }
 
 const SUBCATEGORIA_LABEL: Record<string, string> = {
@@ -114,11 +100,10 @@ export default function GastoCard({ transaccion, tarjetaNombre, cuentas, tarjeta
     })
   }
 
-  const descripcionLabel =
-    transaccion.descripcion || CATEGORIA_LABEL[categoria] || categoria
+  const descripcionLabel = transaccion.descripcion || getGastoCategoriaLabel(categoria) || categoria
   const etiquetas = parseTags(transaccion.etiquetas)
   const metadata = [
-    CATEGORIA_LABEL[categoria] ?? categoria,
+    getGastoCategoriaLabel(categoria) ?? categoria,
     transaccion.subcategoria
       ? (SUBCATEGORIA_LABEL[transaccion.subcategoria] ?? transaccion.subcategoria)
       : null,

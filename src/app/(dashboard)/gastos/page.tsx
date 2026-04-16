@@ -42,6 +42,7 @@ export default async function GastosPage({ searchParams }: Props) {
       .eq('usuario_id', user.id)
       .eq('tipo', 'gasto')
       .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false })
 
   if (periodMeta.start) {
     transaccionesQuery.gte('fecha', periodMeta.start)

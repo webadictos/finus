@@ -394,11 +394,17 @@ Los servicios variables (agua, luz bimestral) y gastos recurrentes estimados (li
 **Decisión:**
 Agregar categoría `casa` al listado de categorías disponibles en `RegistrarGastoForm`.
 
+**Nota de implementación:**
+Si `transacciones.categoria` usa el enum `categoria_transaccion` en la base real, también debe agregarse `casa` al enum mediante migración. No basta con habilitar la opción en UI.
+
 **Cubre:**
 - Gastos de limpieza del hogar
 - Artículos para el hogar
 - Mantenimiento
 - Otros gastos domésticos que no encajan en categorías existentes
+
+**Orden esperado en `/gastos`:**
+Dentro de cada agrupación por fecha, los gastos más recientes deben mostrarse primero, usando `created_at DESC` como desempate además de `fecha DESC`.
 
 
 ---

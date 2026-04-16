@@ -1,23 +1,9 @@
 import { Receipt } from 'lucide-react'
 import { formatFecha, formatMXN } from '@/lib/format'
+import { getGastoCategoriaLabel } from '@/lib/gasto-categorias'
 import type { Database } from '@/types/database'
 
 type Transaccion = Database['public']['Tables']['transacciones']['Row']
-
-const CATEGORIA_LABEL: Record<string, string> = {
-  comida: 'Comida',
-  gasolina: 'Gasolina',
-  despensa: 'Despensa',
-  casa: 'Casa',
-  salud: 'Salud',
-  escuela: 'Escuela',
-  entretenimiento: 'Entretenimiento',
-  mascota: 'Mascota',
-  ropa: 'Ropa',
-  imprevisto: 'Imprevisto',
-  varios_efectivo: 'Varios efectivo',
-  otro: 'Otro',
-}
 
 interface Props {
   gastos: Transaccion[]
@@ -51,8 +37,8 @@ export default function UltimosGastos({ gastos }: Props) {
       <div className="flex flex-col divide-y">
         {gastos.map((gasto) => {
           const monto = Number(gasto.monto ?? 0)
-          const descripcion = gasto.descripcion || CATEGORIA_LABEL[gasto.categoria ?? 'otro'] || 'Gasto'
-          const categoria = gasto.categoria ? (CATEGORIA_LABEL[gasto.categoria] ?? gasto.categoria) : null
+          const descripcion = gasto.descripcion || getGastoCategoriaLabel(gasto.categoria ?? 'otro') || 'Gasto'
+          const categoria = getGastoCategoriaLabel(gasto.categoria)
 
           return (
             <div
