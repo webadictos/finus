@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import AccountMenu from '@/components/dashboard/AccountMenu'
 import MobileNav from '@/components/dashboard/MobileNav'
 import IdleLockOverlay from '@/components/security/IdleLockOverlay'
+import type { TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -15,6 +16,7 @@ interface Props {
   children: React.ReactNode
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  etiquetasSugeridas: TagItem[]
   nombre: string
   email: string
   idleLockEnabled: boolean
@@ -28,6 +30,7 @@ export default function DashboardShell({
   children,
   cuentas,
   tarjetas,
+  etiquetasSugeridas,
   nombre,
   email,
   idleLockEnabled,
@@ -171,7 +174,11 @@ export default function DashboardShell({
           </div>
         </main>
 
-        <MobileNav cuentas={cuentas} tarjetas={tarjetas} />
+        <MobileNav
+          cuentas={cuentas}
+          tarjetas={tarjetas}
+          etiquetasSugeridas={etiquetasSugeridas}
+        />
       </div>
 
       <IdleLockOverlay

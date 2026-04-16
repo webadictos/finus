@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
+import type { TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -11,9 +12,14 @@ type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 interface Props {
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  etiquetasSugeridas?: TagItem[]
 }
 
-export default function SidebarRegistrarGastoButton({ cuentas, tarjetas }: Props) {
+export default function SidebarRegistrarGastoButton({
+  cuentas,
+  tarjetas,
+  etiquetasSugeridas = [],
+}: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -31,6 +37,7 @@ export default function SidebarRegistrarGastoButton({ cuentas, tarjetas }: Props
         onOpenChange={setOpen}
         cuentas={cuentas}
         tarjetas={tarjetas}
+        etiquetasSugeridas={etiquetasSugeridas}
       />
     </>
   )

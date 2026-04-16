@@ -14,6 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { parseTags, type TagItem } from '@/lib/tags'
 import {
   DEFAULT_IDLE_LOCK_ENABLED,
   DEFAULT_IDLE_LOCK_TIMEOUT_MINUTES,
@@ -65,13 +66,30 @@ export default async function DashboardLayout({
     perfil?.idle_lock_timeout_minutes ?? DEFAULT_IDLE_LOCK_TIMEOUT_MINUTES
   )
 
-  const [cuentasRes, tarjetasRes] = await Promise.all([
+  const [cuentasRes, tarjetasRes, etiquetasRes] = await Promise.all([
     supabase.from('cuentas').select('*').eq('activa', true).order('nombre', { ascending: true }),
     supabase.from('tarjetas').select('*').eq('activa', true).order('nombre', { ascending: true }),
+    supabase
+      .from('transacciones')
+      .select('etiquetas')
+      .eq('usuario_id', user?.id ?? '')
+      .eq('tipo', 'gasto')
+      .not('etiquetas', 'is', null),
   ])
 
   const cuentas = cuentasRes.data ?? []
   const tarjetas = tarjetasRes.data ?? []
+  const etiquetasMap = new Map<string, TagItem>()
+  for (const tx of etiquetasRes.data ?? []) {
+    for (const tag of parseTags(tx.etiquetas)) {
+      if (!etiquetasMap.has(tag.slug)) {
+        etiquetasMap.set(tag.slug, tag)
+      }
+    }
+  }
+  const etiquetasSugeridas = Array.from(etiquetasMap.values()).sort((a, b) =>
+    a.label.localeCompare(b.label, 'es-MX')
+  )
 
   return (
     <div className="flex min-h-screen">
@@ -86,7 +104,11 @@ export default async function DashboardLayout({
 
         {/* CTA Registrar gasto */}
         <div className="px-3 pt-3 pb-1">
-          <SidebarRegistrarGastoButton cuentas={cuentas} tarjetas={tarjetas} />
+          <SidebarRegistrarGastoButton
+            cuentas={cuentas}
+            tarjetas={tarjetas}
+            etiquetasSugeridas={etiquetasSugeridas}
+          />
         </div>
 
         {/* Nav */}
@@ -115,6 +137,7 @@ export default async function DashboardLayout({
       <DashboardShell
         cuentas={cuentas}
         tarjetas={tarjetas}
+        etiquetasSugeridas={etiquetasSugeridas}
         nombre={nombreDisplay}
         email={emailDisplay}
         idleLockEnabled={idleLockEnabled}

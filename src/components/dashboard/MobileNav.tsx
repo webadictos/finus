@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import RegistrarGastoForm from '@/components/gastos/RegistrarGastoForm'
 import { cn } from '@/lib/utils'
+import type { TagItem } from '@/lib/tags'
 import type { Database } from '@/types/database'
 
 type Cuenta = Database['public']['Tables']['cuentas']['Row']
@@ -28,6 +29,7 @@ type Tarjeta = Database['public']['Tables']['tarjetas']['Row']
 interface Props {
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  etiquetasSugeridas?: TagItem[]
 }
 
 const MAS_ITEMS = [
@@ -39,7 +41,11 @@ const MAS_ITEMS = [
   { href: '/configuracion', label: 'Config.', icon: Settings },
 ]
 
-export default function MobileNav({ cuentas, tarjetas }: Props) {
+export default function MobileNav({
+  cuentas,
+  tarjetas,
+  etiquetasSugeridas = [],
+}: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [quickOpen, setQuickOpen] = useState(false)
@@ -221,6 +227,7 @@ export default function MobileNav({ cuentas, tarjetas }: Props) {
         onOpenChange={setGastoOpen}
         cuentas={cuentas}
         tarjetas={tarjetas}
+        etiquetasSugeridas={etiquetasSugeridas}
       />
     </>
   )
