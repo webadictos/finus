@@ -46,7 +46,12 @@ export default function IdleLockOverlay({ email, enabled, timeoutMinutes }: Prop
   const lastActivityRef = useRef(lastActivityAt)
   const persistedStateRef = useRef<IdleLockPersistedState>(createIdleLockState())
   const overlayRef = useRef<HTMLDivElement | null>(null)
+  const isLockedRef = useRef(isLocked)
   const timeoutMs = normalizeIdleLockTimeoutMinutes(timeoutMinutes) * 60 * 1000
+
+  useEffect(() => {
+    isLockedRef.current = isLocked
+  }, [isLocked])
 
   const updatePersistedState = useCallback(
     (updater: (current: IdleLockPersistedState) => IdleLockPersistedState) => {
@@ -70,6 +75,10 @@ export default function IdleLockOverlay({ email, enabled, timeoutMinutes }: Prop
 
     const data = await parseJson<{ credentials: WebAuthnCredentialRecord[] }>(response)
     setCredentials(data.credentials)
+
+    if (isLockedRef.current && data.credentials.length > 0) {
+      setUnlockMode('passkey')
+    }
   }, [])
 
   const forceLogout = useCallback(async () => {
@@ -98,7 +107,13 @@ export default function IdleLockOverlay({ email, enabled, timeoutMinutes }: Prop
       lockSessionId: createIdleLockSessionId(),
       lockPresented: true,
     }))
-  }, [credentials.length, updatePersistedState])
+
+    if (credentials.length === 0) {
+      void loadCredentials().catch(() => {
+        setCredentials([])
+      })
+    }
+  }, [credentials.length, loadCredentials, updatePersistedState])
 
   const resetLockState = () => {
     const now = Date.now()
