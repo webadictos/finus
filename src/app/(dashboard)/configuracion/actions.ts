@@ -1,6 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import {
+  normalizeIdleLockEnabled,
+  normalizeIdleLockTimeoutMinutes,
+} from '@/lib/idle-lock'
 import { revalidatePath } from 'next/cache'
 
 export type ActionResult = { error?: string }
@@ -32,6 +36,29 @@ export async function cambiarPassword(nuevaPassword: string): Promise<ActionResu
   const { error } = await supabase.auth.updateUser({ password: nuevaPassword })
   if (error) return { error: error.message }
 
+  return {}
+}
+
+export async function actualizarPreferenciasSeguridad(input: {
+  idleLockEnabled: boolean
+  idleLockTimeoutMinutes: number
+}): Promise<ActionResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const { error } = await supabase
+    .from('usuarios')
+    .update({
+      idle_lock_enabled: normalizeIdleLockEnabled(input.idleLockEnabled),
+      idle_lock_timeout_minutes: normalizeIdleLockTimeoutMinutes(input.idleLockTimeoutMinutes),
+    })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/configuracion')
+  revalidatePath('/', 'layout')
   return {}
 }
 

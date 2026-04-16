@@ -2,7 +2,7 @@
 
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useState, useSyncExternalStore, useTransition } from 'react'
 import { Fingerprint } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -27,11 +27,10 @@ async function parseJson<T>(response: Response): Promise<T> {
 
 export default function PasskeyLoginButton() {
   const router = useRouter()
-  const [isSupported] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      browserSupportsWebAuthn() &&
-      window.isSecureContext
+  const isSupported = useSyncExternalStore(
+    () => () => {},
+    () => browserSupportsWebAuthn() && window.isSecureContext,
+    () => false
   )
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()

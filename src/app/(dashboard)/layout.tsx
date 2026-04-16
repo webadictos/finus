@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import AccountMenu from '@/components/dashboard/AccountMenu'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import SidebarRegistrarGastoButton from '@/components/dashboard/SidebarRegistrarGastoButton'
 import {
@@ -10,10 +11,15 @@ import {
   BarChart3,
   Target,
   Landmark,
-  Settings,
   ShieldCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  DEFAULT_IDLE_LOCK_ENABLED,
+  DEFAULT_IDLE_LOCK_TIMEOUT_MINUTES,
+  normalizeIdleLockEnabled,
+  normalizeIdleLockTimeoutMinutes,
+} from '@/lib/idle-lock'
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -42,6 +48,22 @@ export default async function DashboardLayout({
     'Usuario'
 
   const email = user?.email ?? ''
+  const { data: perfil } = user
+    ? await supabase
+        .from('usuarios')
+        .select('nombre, email, idle_lock_enabled, idle_lock_timeout_minutes')
+        .eq('id', user.id)
+        .maybeSingle()
+    : { data: null }
+
+  const nombreDisplay = perfil?.nombre ?? nombre
+  const emailDisplay = perfil?.email ?? email
+  const idleLockEnabled = normalizeIdleLockEnabled(
+    perfil?.idle_lock_enabled ?? DEFAULT_IDLE_LOCK_ENABLED
+  )
+  const idleLockTimeoutMinutes = normalizeIdleLockTimeoutMinutes(
+    perfil?.idle_lock_timeout_minutes ?? DEFAULT_IDLE_LOCK_TIMEOUT_MINUTES
+  )
 
   const [cuentasRes, tarjetasRes] = await Promise.all([
     supabase.from('cuentas').select('*').eq('activa', true).order('nombre', { ascending: true }),
@@ -85,24 +107,19 @@ export default async function DashboardLayout({
 
         {/* User + configuración */}
         <div className="border-t p-3">
-          <div className="rounded-md px-3 py-2">
-            <p className="text-sm font-medium truncate">{nombre}</p>
-            <p className="text-xs text-muted-foreground truncate">{email}</p>
-          </div>
-          <Link
-            href="/configuracion"
-            className={cn(
-              'flex items-center gap-2.5 rounded-md px-3 py-2 text-[15px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
-            )}
-          >
-            <Settings className="size-4 shrink-0" />
-            Configuración
-          </Link>
+          <AccountMenu nombre={nombreDisplay} email={emailDisplay} variant="desktop" />
         </div>
       </aside>
 
       {/* Main content */}
-      <DashboardShell cuentas={cuentas} tarjetas={tarjetas} email={email}>
+      <DashboardShell
+        cuentas={cuentas}
+        tarjetas={tarjetas}
+        nombre={nombreDisplay}
+        email={emailDisplay}
+        idleLockEnabled={idleLockEnabled}
+        idleLockTimeoutMinutes={idleLockTimeoutMinutes}
+      >
         {children}
       </DashboardShell>
     </div>

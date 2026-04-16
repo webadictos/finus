@@ -32,6 +32,8 @@
 | email | text | |
 | nombre | text\|null | |
 | avatar_url | text\|null | |
+| idle_lock_enabled | boolean | default true |
+| idle_lock_timeout_minutes | int | default 5 |
 | created_at | timestamptz | |
 | updated_at | timestamptz | |
 

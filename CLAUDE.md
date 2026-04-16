@@ -281,6 +281,8 @@ Campos afectados: `monto`, `monto_esperado`, `monto_real`, `saldo_actual`, `mont
 | email                   | text                   |
 | nombre                  | text\|null             |
 | avatar_url              | text\|null             |
+| idle_lock_enabled       | boolean                |
+| idle_lock_timeout_minutes | int                  |
 | created_at / updated_at | timestamptz            |
 
 ### `cuentas`

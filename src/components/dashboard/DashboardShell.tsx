@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Settings } from 'lucide-react'
+import AccountMenu from '@/components/dashboard/AccountMenu'
 import MobileNav from '@/components/dashboard/MobileNav'
 import IdleLockOverlay from '@/components/security/IdleLockOverlay'
 import type { Database } from '@/types/database'
@@ -15,7 +15,10 @@ interface Props {
   children: React.ReactNode
   cuentas: Cuenta[]
   tarjetas: Tarjeta[]
+  nombre: string
   email: string
+  idleLockEnabled: boolean
+  idleLockTimeoutMinutes: number
 }
 
 const PULL_THRESHOLD = 72
@@ -25,7 +28,10 @@ export default function DashboardShell({
   children,
   cuentas,
   tarjetas,
+  nombre,
   email,
+  idleLockEnabled,
+  idleLockTimeoutMinutes,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
@@ -138,12 +144,7 @@ export default function DashboardShell({
             <Link href="/">
               <img src="/finus.svg" height={32} alt="Finus" style={{ height: 32 }} />
             </Link>
-            <Link
-              href="/configuracion"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <Settings className="size-5" />
-            </Link>
+            <AccountMenu nombre={nombre} email={email} variant="mobile" />
           </div>
         </header>
 
@@ -173,7 +174,11 @@ export default function DashboardShell({
         <MobileNav cuentas={cuentas} tarjetas={tarjetas} />
       </div>
 
-      <IdleLockOverlay email={email} />
+      <IdleLockOverlay
+        email={email}
+        enabled={idleLockEnabled}
+        timeoutMinutes={idleLockTimeoutMinutes}
+      />
     </div>
   )
 }

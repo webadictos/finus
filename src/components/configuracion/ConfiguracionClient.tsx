@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Dialog } from 'radix-ui'
 import { LogOut, AlertTriangle, X } from 'lucide-react'
@@ -7,15 +8,35 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import PasskeysSection from '@/components/configuracion/PasskeysSection'
-import { actualizarPerfil, cambiarPassword, resetearDatos } from '@/app/(dashboard)/configuracion/actions'
+import {
+  actualizarPerfil,
+  actualizarPreferenciasSeguridad,
+  cambiarPassword,
+  resetearDatos,
+} from '@/app/(dashboard)/configuracion/actions'
 import { logoutAction } from '@/app/(auth)/actions'
+import {
+  getIdleLockTimeoutLabel,
+  IDLE_LOCK_TIMEOUT_OPTIONS,
+  normalizeIdleLockEnabled,
+  normalizeIdleLockTimeoutMinutes,
+} from '@/lib/idle-lock'
+import { cn } from '@/lib/utils'
 
 interface Props {
   nombre: string | null
   email: string
+  idleLockEnabled: boolean
+  idleLockTimeoutMinutes: number
 }
 
-export default function ConfiguracionClient({ nombre, email }: Props) {
+export default function ConfiguracionClient({
+  nombre,
+  email,
+  idleLockEnabled,
+  idleLockTimeoutMinutes,
+}: Props) {
+  const router = useRouter()
   // ── Perfil ──────────────────────────────────────────────────────────────────
   const [nombreValue, setNombreValue] = useState(nombre ?? '')
   const [perfilMsg, setPerfilMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
@@ -31,6 +52,36 @@ export default function ConfiguracionClient({ nombre, email }: Props) {
         setPerfilMsg({ tipo: 'error', texto: result.error })
       } else {
         setPerfilMsg({ tipo: 'ok', texto: 'Perfil actualizado correctamente.' })
+        router.refresh()
+      }
+    })
+  }
+
+  // ── Preferencias de seguridad ──────────────────────────────────────────────
+  const [idleEnabledValue, setIdleEnabledValue] = useState(() =>
+    normalizeIdleLockEnabled(idleLockEnabled)
+  )
+  const [idleTimeoutValue, setIdleTimeoutValue] = useState(() =>
+    normalizeIdleLockTimeoutMinutes(idleLockTimeoutMinutes)
+  )
+  const [prefsMsg, setPrefsMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null)
+  const [prefsPending, startPrefsTransition] = useTransition()
+
+  const handleGuardarPreferencias = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setPrefsMsg(null)
+
+    startPrefsTransition(async () => {
+      const result = await actualizarPreferenciasSeguridad({
+        idleLockEnabled: idleEnabledValue,
+        idleLockTimeoutMinutes: idleTimeoutValue,
+      })
+
+      if (result.error) {
+        setPrefsMsg({ tipo: 'error', texto: result.error })
+      } else {
+        setPrefsMsg({ tipo: 'ok', texto: 'Preferencias de inactividad actualizadas.' })
+        router.refresh()
       }
     })
   }
@@ -142,14 +193,85 @@ export default function ConfiguracionClient({ nombre, email }: Props) {
       <div className="border-t" />
 
       {/* ── Preferencias ── */}
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-4">
         <div>
-          <h2 className="text-base font-semibold">Preferencias</h2>
-          <p className="text-sm text-muted-foreground">Moneda, zona horaria y más</p>
+          <h2 className="text-base font-semibold">Bloqueo por inactividad</h2>
+          <p className="text-sm text-muted-foreground">Protege Finus cuando dejas el dispositivo sin uso</p>
         </div>
-        <div className="rounded-xl border bg-muted/40 px-4 py-5 text-sm text-muted-foreground text-center">
-          Próximamente
-        </div>
+
+        <form onSubmit={handleGuardarPreferencias} className="flex flex-col gap-4">
+          <div className="rounded-2xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Pantalla por inactividad</p>
+                <p className="text-sm text-muted-foreground">
+                  Bloquea la app y pide passkey o contraseña después de un periodo sin actividad.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={idleEnabledValue}
+                onClick={() => setIdleEnabledValue((current) => !current)}
+                className={cn(
+                  'relative inline-flex h-7 w-12 shrink-0 rounded-full border transition-colors',
+                  idleEnabledValue ? 'border-primary bg-primary' : 'border-border bg-muted'
+                )}
+              >
+                <span
+                  className={cn(
+                    'absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform',
+                    idleEnabledValue ? 'translate-x-6' : 'translate-x-0.5'
+                  )}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="idle-timeout">Tiempo de bloqueo</Label>
+            <select
+              id="idle-timeout"
+              value={idleTimeoutValue}
+              onChange={(event) =>
+                setIdleTimeoutValue(
+                  normalizeIdleLockTimeoutMinutes(Number(event.target.value))
+                )
+              }
+              disabled={!idleEnabledValue}
+              className={cn(
+                'w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring',
+                !idleEnabledValue && 'cursor-not-allowed opacity-60'
+              )}
+            >
+              {IDLE_LOCK_TIMEOUT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {getIdleLockTimeoutLabel(option)}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Si desactivas el bloqueo, la app no mostrará la pantalla de inactividad.
+            </p>
+          </div>
+
+          {prefsMsg && (
+            <p
+              className={`rounded-md px-3 py-2 text-sm ${
+                prefsMsg.tipo === 'ok'
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-destructive/10 text-destructive'
+              }`}
+            >
+              {prefsMsg.texto}
+            </p>
+          )}
+
+          <Button type="submit" disabled={prefsPending} className="self-start">
+            {prefsPending ? 'Guardando…' : 'Guardar preferencias'}
+          </Button>
+        </form>
       </section>
 
       <div className="border-t" />

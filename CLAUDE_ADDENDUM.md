@@ -302,12 +302,15 @@ Página `/configuracion` accesible desde el sidebar (icono de engrane o avatar d
 **Secciones:**
 - **Perfil** — nombre, email, avatar
 - **Cuentas** — acceso directo a `/cuentas`
-- **Preferencias** — moneda default, zona horaria
+- **Preferencias** — incluir bloqueo por inactividad configurable (`idle_lock_enabled`, `idle_lock_timeout_minutes`)
 - **Danger zone** — botón Reset general (ver Sección 5), cerrar sesión
 
 **Notas:**
 - El reset general vive aquí, no en el flujo principal
-- Cerrar sesión también vive aquí — quitar `LogoutButton` del sidebar si está ahí actualmente
+- El acceso principal de cuenta debe vivir en un menú de avatar: dropdown en desktop desde el bloque del usuario y sheet en móvil desde el header
+- Cerrar sesión también vive aquí y en el menú de cuenta; no dejar un botón suelto separado en el sidebar
+- El bloqueo por inactividad debe sobrevivir refresh en la pestaña actual usando `sessionStorage`
+- Si la pantalla de bloqueo ya apareció y desaparece sin desbloqueo válido, cerrar sesión automáticamente
 
 
 ---

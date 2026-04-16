@@ -27,6 +27,8 @@ export interface Database {
           email: string
           nombre: string | null
           avatar_url: string | null
+          idle_lock_enabled: boolean
+          idle_lock_timeout_minutes: number
           created_at: string
           updated_at: string
         }
@@ -35,6 +37,8 @@ export interface Database {
           email: string
           nombre?: string | null
           avatar_url?: string | null
+          idle_lock_enabled?: boolean
+          idle_lock_timeout_minutes?: number
           created_at?: string
           updated_at?: string
         }
@@ -43,6 +47,8 @@ export interface Database {
           email?: string
           nombre?: string | null
           avatar_url?: string | null
+          idle_lock_enabled?: boolean
+          idle_lock_timeout_minutes?: number
           updated_at?: string
         }
         Relationships: Rel[]

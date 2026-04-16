@@ -146,6 +146,8 @@ CREATE TABLE usuarios (
   email       TEXT        NOT NULL,
   nombre      TEXT,
   avatar_url  TEXT,
+  idle_lock_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  idle_lock_timeout_minutes INT NOT NULL DEFAULT 5,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

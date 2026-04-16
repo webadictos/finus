@@ -7,12 +7,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import {
+  clearIdleLockState,
+  createIdleLockSessionId,
+  createIdleLockState,
+  getIdleLockTimeoutLabel,
+  normalizeIdleLockTimeoutMinutes,
+  readIdleLockState,
+  writeIdleLockState,
+  type IdleLockPersistedState,
+} from '@/lib/idle-lock'
 import { type WebAuthnCredentialRecord } from '@/lib/webauthn'
-
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000
 
 interface Props {
   email: string
+  enabled: boolean
+  timeoutMinutes: number
 }
 
 async function parseJson<T>(response: Response): Promise<T> {
@@ -23,7 +33,7 @@ async function parseJson<T>(response: Response): Promise<T> {
   return data
 }
 
-export default function IdleLockOverlay({ email }: Props) {
+export default function IdleLockOverlay({ email, enabled, timeoutMinutes }: Props) {
   const [supabase] = useState(() => createClient())
   const [isLocked, setIsLocked] = useState(false)
   const [password, setPassword] = useState('')
@@ -31,8 +41,21 @@ export default function IdleLockOverlay({ email }: Props) {
   const [unlockMode, setUnlockMode] = useState<'passkey' | 'password'>('passkey')
   const [credentials, setCredentials] = useState<WebAuthnCredentialRecord[]>([])
   const [lastActivityAt, setLastActivityAt] = useState(() => Date.now())
+  const [isForcingLogout, setIsForcingLogout] = useState(false)
   const [isAuthenticating, startTransition] = useTransition()
   const lastActivityRef = useRef(lastActivityAt)
+  const persistedStateRef = useRef<IdleLockPersistedState>(createIdleLockState())
+  const overlayRef = useRef<HTMLDivElement | null>(null)
+  const timeoutMs = normalizeIdleLockTimeoutMinutes(timeoutMinutes) * 60 * 1000
+
+  const updatePersistedState = useCallback(
+    (updater: (current: IdleLockPersistedState) => IdleLockPersistedState) => {
+      const next = updater(persistedStateRef.current)
+      persistedStateRef.current = next
+      writeIdleLockState(next)
+    },
+    []
+  )
 
   const loadCredentials = useCallback(async () => {
     const response = await fetch('/api/webauthn/credentials', {
@@ -49,7 +72,97 @@ export default function IdleLockOverlay({ email }: Props) {
     setCredentials(data.credentials)
   }, [])
 
+  const forceLogout = useCallback(async () => {
+    if (isForcingLogout) return
+
+    setIsForcingLogout(true)
+    clearIdleLockState()
+    await supabase.auth.signOut()
+    window.location.assign('/login')
+  }, [isForcingLogout, supabase])
+
+  const activateLock = useCallback(() => {
+    const lockedAt = Date.now()
+    const previousActivity = lastActivityRef.current
+
+    setLastActivityAt(previousActivity)
+    setIsLocked(true)
+    setUnlockMode(credentials.length > 0 ? 'passkey' : 'password')
+    setPassword('')
+    setError(null)
+
+    updatePersistedState((current) => ({
+      ...current,
+      lockedAt,
+      lastActivityAt: previousActivity,
+      lockSessionId: createIdleLockSessionId(),
+      lockPresented: true,
+    }))
+  }, [credentials.length, updatePersistedState])
+
+  const resetLockState = () => {
+    const now = Date.now()
+    lastActivityRef.current = now
+    setLastActivityAt(now)
+    setPassword('')
+    setError(null)
+    setIsLocked(false)
+
+    updatePersistedState((current) => ({
+      ...current,
+      lockedAt: null,
+      lastActivityAt: now,
+      unlockVerifiedAt: now,
+      lockSessionId: null,
+      lockPresented: false,
+    }))
+  }
+
   useEffect(() => {
+    if (!enabled) {
+      clearIdleLockState()
+      persistedStateRef.current = createIdleLockState()
+      lastActivityRef.current = Date.now()
+      setLastActivityAt(lastActivityRef.current)
+      setIsLocked(false)
+      setPassword('')
+      setError(null)
+      return
+    }
+
+    const persisted = readIdleLockState()
+    const now = Date.now()
+
+    if (persisted) {
+      persistedStateRef.current = persisted
+      lastActivityRef.current = persisted.lastActivityAt
+      setLastActivityAt(persisted.lastActivityAt)
+
+      if (
+        persisted.lockPresented &&
+        persisted.lockedAt &&
+        (!persisted.unlockVerifiedAt || persisted.unlockVerifiedAt < persisted.lockedAt)
+      ) {
+        void forceLogout()
+        return
+      }
+
+      if (now - persisted.lastActivityAt >= timeoutMs) {
+        activateLock()
+        return
+      }
+    } else {
+      const initialState = createIdleLockState(now)
+      persistedStateRef.current = initialState
+      writeIdleLockState(initialState)
+      lastActivityRef.current = now
+      setLastActivityAt(now)
+    }
+  }, [activateLock, enabled, forceLogout, timeoutMs])
+
+  useEffect(() => {
+    if (!enabled || isForcingLogout) return
+
     const timeoutId = window.setTimeout(() => {
       void loadCredentials().catch(() => {
         setCredentials([])
@@ -68,22 +181,24 @@ export default function IdleLockOverlay({ email }: Props) {
       window.clearTimeout(timeoutId)
       subscription.unsubscribe()
     }
-  }, [loadCredentials, supabase])
+  }, [enabled, isForcingLogout, loadCredentials, supabase])
 
   useEffect(() => {
-    if (isLocked) return
+    if (!enabled || isLocked || isForcingLogout) return
 
     const markActivity = () => {
       const now = Date.now()
       lastActivityRef.current = now
       setLastActivityAt(now)
+      updatePersistedState((current) => ({
+        ...current,
+        lastActivityAt: now,
+      }))
     }
 
     const checkForLock = () => {
-      if (Date.now() - lastActivityRef.current >= IDLE_TIMEOUT_MS) {
-        setIsLocked(true)
-        setUnlockMode(credentials.length > 0 ? 'passkey' : 'password')
-        setError(null)
+      if (Date.now() - lastActivityRef.current >= timeoutMs) {
+        activateLock()
       }
     }
 
@@ -118,16 +233,44 @@ export default function IdleLockOverlay({ email }: Props) {
       window.removeEventListener('focus', checkForLock)
       window.clearInterval(intervalId)
     }
-  }, [credentials.length, isLocked])
+  }, [activateLock, enabled, isForcingLogout, isLocked, timeoutMs, updatePersistedState])
 
-  const resetLockState = () => {
-    const now = Date.now()
-    lastActivityRef.current = now
-    setLastActivityAt(now)
-    setPassword('')
-    setError(null)
-    setIsLocked(false)
-  }
+  useEffect(() => {
+    if (!enabled || !isLocked || isForcingLogout) return
+
+    const handlePointerGuard = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) {
+        void forceLogout()
+        return
+      }
+
+      if (!overlayRef.current?.contains(target)) {
+        void forceLogout()
+      }
+    }
+
+    const handleFocusGuard = () => {
+      const activeElement = document.activeElement
+      if (activeElement instanceof Node && overlayRef.current?.contains(activeElement)) return
+      void forceLogout()
+    }
+
+    const integrityId = window.setInterval(() => {
+      if (!overlayRef.current?.isConnected) {
+        void forceLogout()
+      }
+    }, 750)
+
+    window.addEventListener('pointerdown', handlePointerGuard, true)
+    document.addEventListener('focusin', handleFocusGuard)
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerGuard, true)
+      document.removeEventListener('focusin', handleFocusGuard)
+      window.clearInterval(integrityId)
+    }
+  }, [enabled, forceLogout, isForcingLogout, isLocked])
 
   const handlePasskeyUnlock = () => {
     if (credentials.length === 0) {
@@ -200,7 +343,7 @@ export default function IdleLockOverlay({ email }: Props) {
     })
   }
 
-  if (!isLocked) return null
+  if (!enabled || !isLocked) return null
 
   const lastActivityLabel = new Date(lastActivityAt).toLocaleTimeString('es-MX', {
     hour: '2-digit',
@@ -208,7 +351,11 @@ export default function IdleLockOverlay({ email }: Props) {
   })
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-background/90 px-4 backdrop-blur-sm">
+    <div
+      id="finus-idle-lock-overlay"
+      ref={overlayRef}
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-background/90 px-4 backdrop-blur-sm"
+    >
       <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl">
         <div className="flex flex-col gap-4">
           <div className="flex items-start gap-3">
@@ -218,7 +365,7 @@ export default function IdleLockOverlay({ email }: Props) {
             <div className="space-y-1">
               <h2 className="text-lg font-semibold">Finus bloqueado</h2>
               <p className="text-sm text-muted-foreground">
-                Se bloqueó por 5 minutos de inactividad. Última actividad a las {lastActivityLabel}.
+                Se bloqueó por {getIdleLockTimeoutLabel(timeoutMinutes)} de inactividad. Última actividad a las {lastActivityLabel}.
               </p>
             </div>
           </div>
